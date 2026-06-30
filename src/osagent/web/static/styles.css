@@ -266,3 +266,83 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   outline: none; border-color: var(--accent);
 }
 .qa-thinking { color: var(--muted); font-style: italic; }
+
+/* ---------- Verifier 抗幻觉核验报告 ---------- */
+.qa-vdetail {
+  margin: 8px 0;
+  border-radius: 6px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.08);
+}
+.qa-vsummary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  user-select: none;
+  list-style: none;
+}
+.qa-vsummary::-webkit-details-marker { display: none; }
+.qa-vsummary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform .2s;
+}
+.qa-vdetail[open] .qa-vsummary::before { transform: rotate(90deg); }
+
+.qa-vsummary-ok   { background: rgba(34,197,94,.12);  color: #4ade80; border-left: 3px solid #22c55e; }
+.qa-vsummary-warn { background: rgba(250,204,21,.12); color: #facc15; border-left: 3px solid #eab308; }
+.qa-vsummary-bad  { background: rgba(239,68,68,.15);  color: #f87171; border-left: 3px solid #ef4444; }
+.qa-vsummary-skip { background: rgba(148,163,184,.10); color: #94a3b8; border-left: 3px solid #64748b; }
+
+.qa-vcount {
+  margin-left: 8px;
+  font-size: 11px;
+  opacity: .8;
+  font-family: var(--font-mono, monospace);
+}
+.qa-vcchecks {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: #f87171;
+}
+.qa-vcchecks ul { margin: 4px 0 0 0; padding-left: 18px; }
+.qa-vclaims {
+  margin: 0;
+  padding: 4px 14px 10px 32px;
+  font-size: 12px;
+}
+.qa-vclaim {
+  padding: 6px 8px;
+  margin: 4px 0;
+  border-radius: 4px;
+  background: rgba(255,255,255,.02);
+  border-left: 2px solid transparent;
+}
+.qa-v-supported    { border-left-color: #22c55e; }
+.qa-v-partial      { border-left-color: #eab308; }
+.qa-v-unsupported  { border-left-color: #ef4444; background: rgba(239,68,68,.06); }
+.qa-v-unverifiable { border-left-color: #64748b; }
+
+.qa-vhead { font-weight: 500; }
+.qa-vcite {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono, monospace);
+  margin: 0 4px;
+}
+.qa-vreason { font-size: 11px; color: var(--muted); margin-top: 4px; padding-left: 22px; }
+.qa-vevidence {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 4px;
+  padding-left: 22px;
+  font-style: italic;
+}
+.qa-vmeta {
+  padding: 6px 14px;
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid rgba(255,255,255,.05);
+}

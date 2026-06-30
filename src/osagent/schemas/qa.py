@@ -17,6 +17,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from .verification import VerificationReport
+
 
 QAScope = Literal["repo", "compare", "global"]
 
@@ -110,3 +112,6 @@ class QAResponse(BaseModel):
 
     # 风险提示：证据稀疏 / scope 不匹配 / LLM 失败回退到模板等
     warnings: list[str] = Field(default_factory=list)
+
+    # 抗幻觉核验报告（verifier 输出）。可能为 None（关闭 / 无答复）
+    verification: VerificationReport | None = None

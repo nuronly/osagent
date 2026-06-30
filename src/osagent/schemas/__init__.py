@@ -78,3 +78,20 @@ __all__ = [
     "QASourceType",
     "TokenUsage",
 ]
+
+# verification（抗幻觉核验报告）
+from .verification import (  # noqa: E402
+    CitationCheck,
+    ClaimVerdict,
+    VerificationReport,
+    VerificationStatus,
+    VerifiedClaim,
+)
+
+__all__ += [
+    "CitationCheck",
+    "ClaimVerdict",
+    "VerificationReport",
+    "VerificationStatus",
+    "VerifiedClaim",
+]

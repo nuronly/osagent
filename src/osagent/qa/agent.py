@@ -19,6 +19,7 @@ from ..schemas.qa import (
 )
 from .prompt import build_messages
 from .retriever import retrieve
+from .verifier import verify as verify_answer
 
 # 匹配 [1] / [1,2] / [1][2] 这种引用
 _CITE_RE = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
@@ -124,6 +125,21 @@ def ask(req: QARequest) -> QAResponse:
         if k in {"prompt_tokens", "completion_tokens", "total_tokens"}
     })
 
+    # ---- 抗幻觉核验（CitationCop 规则 + LLM 拆 claim + 逐条核验）----
+    try:
+        verification = verify_answer(answer, items, used_sources, enabled=True)
+        # 把 verifier 自己的 warnings 合进主流程
+        if verification.warnings:
+            warns = warns + verification.warnings
+        # 状态 hint 也带一条 warning，方便日志快速过滤
+        if verification.status == "rejected":
+            warns = warns + [f"verifier: {verification.summary}"]
+    except Exception as e:
+        # 兜底兜底再兜底：verifier 任何意外都不影响主答复
+        logger.exception("verifier 总入口异常（已忽略，不影响答复返回）")
+        verification = None
+        warns = warns + [f"verifier crashed: {type(e).__name__}: {e}"]
+
     return QAResponse(
         question=req.question,
         scope=req.scope,
@@ -136,4 +152,5 @@ def ask(req: QARequest) -> QAResponse:
         usage=usage,
         latency_ms=int((time.time() - t0) * 1000),
         warnings=warns,
+        verification=verification,
     )

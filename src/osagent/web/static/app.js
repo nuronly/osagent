@@ -642,10 +642,58 @@ function appendQaMsg(historyId, role, html, extra) {
   return div;
 }
 
+function buildVerificationBadge(v) {
+  if (!v) return "";
+  const statusMap = {
+    verified: { icon: "✅", cls: "ok", label: "已核验" },
+    partial:  { icon: "⚠️", cls: "warn", label: "部分支持" },
+    rejected: { icon: "❌", cls: "bad", label: "建议拒收" },
+    skipped:  { icon: "⚪", cls: "skip", label: "未核验" },
+  };
+  const meta = statusMap[v.status] || statusMap.skipped;
+  const counts = (v.n_supported + v.n_partial + v.n_unsupported + v.n_unverifiable) > 0
+    ? `<span class="qa-vcount">✓${v.n_supported} ⚠${v.n_partial} ✗${v.n_unsupported} ?${v.n_unverifiable}</span>`
+    : "";
+
+  const claimsHtml = (v.claims || []).map((c, i) => {
+    const verdictIcon = {supported:"✅", partial:"⚠️", unsupported:"❌", unverifiable:"⚪"}[c.verdict] || "⚪";
+    const cited = (c.cited_indices || []).length ? `[${c.cited_indices.join(",")}]` : "";
+    const quote = c.evidence_quote ? `<div class="qa-vevidence">证据："${escapeHtml(c.evidence_quote)}"</div>` : "";
+    return `
+      <li class="qa-vclaim qa-v-${c.verdict}">
+        <div class="qa-vhead">${verdictIcon} <span class="qa-vcite">${cited}</span> ${escapeHtml(c.claim)}</div>
+        ${c.reason ? `<div class="qa-vreason">${escapeHtml(c.reason)}</div>` : ""}
+        ${quote}
+      </li>
+    `;
+  }).join("");
+
+  const cchecks = (v.citation_checks || []).filter(c => !c.ok);
+  const cchecksHtml = cchecks.length
+    ? `<div class="qa-vcchecks"><b>形式审查问题：</b><ul>${cchecks.map(c => `<li>[${c.index}] ${escapeHtml(c.reason)}</li>`).join("")}</ul></div>`
+    : "";
+
+  const detail = `
+    <details class="qa-vdetail">
+      <summary class="qa-vsummary qa-vsummary-${meta.cls}">${meta.icon} ${escapeHtml(v.summary || meta.label)} ${counts}</summary>
+      ${cchecksHtml}
+      ${claimsHtml ? `<ol class="qa-vclaims">${claimsHtml}</ol>` : ""}
+      ${v.verifier_model ? `<div class="qa-vmeta">verifier: ${escapeHtml(v.verifier_model)} · ${v.verifier_latency_ms}ms</div>` : ""}
+    </details>
+  `;
+  return detail;
+}
+
 function buildSourcesBlock(resp) {
-  if (!resp.sources || resp.sources.length === 0) return "";
-  const lis = resp.sources.map((s, i) => renderSourceLine(i + 1, s)).join("");
-  let extra = `<div class="qa-sources"><b>引用</b>（${resp.sources.length} 条）<ol>${lis}</ol></div>`;
+  let extra = "";
+  // verifier badge 放在最前面，最显眼
+  if (resp.verification) {
+    extra += buildVerificationBadge(resp.verification);
+  }
+  if (resp.sources && resp.sources.length > 0) {
+    const lis = resp.sources.map((s, i) => renderSourceLine(i + 1, s)).join("");
+    extra += `<div class="qa-sources"><b>引用</b>（${resp.sources.length} 条）<ol>${lis}</ol></div>`;
+  }
   if (resp.warnings && resp.warnings.length) {
     extra += `<div class="qa-warnings">⚠️ ${resp.warnings.map(escapeHtml).join(" · ")}</div>`;
   }
