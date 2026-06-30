@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from openai import OpenAI
@@ -63,6 +64,44 @@ class DeepSeekClient:
 
         resp = self.client.chat.completions.create(**params)
         return resp.choices[0].message.content or ""
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True,
+    )
+    def chat_full(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        temperature: float = 0.0,
+        max_tokens: int = 2048,
+        response_format: dict[str, Any] | None = None,
+        **kwargs,
+    ) -> dict[str, Any]:
+        """对话并返回完整结构：{answer, model, usage, latency_ms}。
+
+        QA agent 需要 usage 透传以便前端展示成本与延迟。
+        """
+        params: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if response_format:
+            params["response_format"] = response_format
+        params.update(kwargs)
+
+        t0 = time.time()
+        resp = self.client.chat.completions.create(**params)
+        latency_ms = int((time.time() - t0) * 1000)
+        return {
+            "answer": resp.choices[0].message.content or "",
+            "model": resp.model,
+            "usage": resp.usage.model_dump() if resp.usage else {},
+            "latency_ms": latency_ms,
+        }
 
     def ping(self) -> dict[str, Any]:
         """冒烟测试：返回模型、用量、回答。"""

@@ -187,3 +187,82 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   padding: 4px 8px;
 }
 #facts-content:empty { display: none; }
+
+/* ============ QA 聊天框 ============ */
+.qa-suggest {
+  display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 .5rem;
+}
+.chip {
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px; padding: 4px 10px;
+  font-size: 12px; cursor: pointer; transition: all .15s;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.qa-history {
+  display: flex; flex-direction: column; gap: 10px;
+  max-height: 460px; overflow-y: auto;
+  padding: 4px 0;
+}
+.qa-msg {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.qa-msg.user { border-left: 3px solid var(--accent); }
+.qa-msg.assistant { border-left: 3px solid var(--accent-2); }
+.qa-msg.error { border-left: 3px solid #f87171; }
+.qa-msg .qa-role {
+  font-size: 11px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+  margin-bottom: 4px;
+}
+.qa-msg .qa-body {
+  font-size: 13px; line-height: 1.6; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+}
+.qa-msg .qa-body code {
+  background: #0a0d13; padding: 1px 4px; border-radius: 3px;
+  font-size: 12px; color: var(--accent-2);
+}
+.qa-msg .qa-body pre {
+  background: #0a0d13; padding: 8px; border-radius: 4px;
+  overflow-x: auto; font-size: 12px; color: var(--accent-2);
+  max-height: 220px;
+}
+.qa-msg .qa-cite {
+  display: inline-block; background: rgba(96,165,250,.18);
+  color: var(--accent); padding: 0 4px; border-radius: 3px;
+  font-size: 11px; cursor: pointer; margin: 0 2px;
+}
+.qa-msg .qa-cite:hover { background: rgba(96,165,250,.35); }
+.qa-sources {
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 11.5px; color: var(--muted);
+}
+.qa-sources ol { margin: 4px 0 0; padding-left: 18px; }
+.qa-sources li { margin: 2px 0; }
+.qa-sources .src-loc { color: var(--accent-2); font-family: monospace; font-size: 11px; }
+.qa-sources .src-anchor { color: var(--accent); font-family: monospace; font-size: 11px; }
+.qa-warnings {
+  margin-top: 6px; font-size: 11.5px; color: #fbbf24;
+}
+.qa-meta {
+  margin-top: 4px; font-size: 11px; color: var(--muted);
+}
+.qa-input {
+  display: flex; gap: 6px; margin-top: 8px; align-items: flex-end;
+}
+.qa-input textarea {
+  flex: 1; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px; font-size: 13px; resize: vertical;
+  font-family: inherit;
+}
+.qa-input textarea:focus {
+  outline: none; border-color: var(--accent);
+}
+.qa-thinking { color: var(--muted); font-style: italic; }

@@ -29,6 +29,15 @@ from .compare import (
     SubsystemDiff,
     SyscallDiff,
 )
+from .qa import (
+    QAContextItem,
+    QARequest,
+    QAResponse,
+    QAScope,
+    QASource,
+    QASourceType,
+    TokenUsage,
+)
 
 __all__ = [
     "Manifest",
@@ -60,4 +69,12 @@ __all__ = [
     "SetDiff",
     "SubsystemDiff",
     "SyscallDiff",
+    # qa
+    "QAContextItem",
+    "QARequest",
+    "QAResponse",
+    "QAScope",
+    "QASource",
+    "QASourceType",
+    "TokenUsage",
 ]

@@ -45,7 +45,10 @@ from ..ingest import (
 )
 from ..llm import get_client
 from ..logging import logger
+from ..qa import ask as qa_ask
+from ..qa.retriever import retrieve as qa_retrieve
 from ..schemas import RepoStatus
+from ..schemas.qa import QARequest
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -372,6 +375,44 @@ def create_app() -> FastAPI:
                 status_code=500,
                 content={"ok": False, "error": str(e)},
             )
+
+    # ---------- QA（检索增强问答） ----------
+
+    @app.post("/api/qa")
+    def api_qa(req: QARequest) -> dict[str, Any]:
+        """开放问答：scope=repo|compare|global。
+
+        body 示例（repo）::
+
+            {"question": "内存管理用了什么算法？", "scope": "repo",
+             "repo_id": "2024_001_xxx"}
+
+        body 示例（compare）::
+
+            {"question": "ECNU 九队与 RuaruaOs 的 syscall 设计本质区别在哪？",
+             "scope": "compare", "repo_id_a": "...", "repo_id_b": "..."}
+        """
+        try:
+            resp = qa_ask(req)
+        except Exception as e:
+            logger.exception("QA 失败")
+            raise HTTPException(500, f"QA 失败: {e}")
+        return resp.model_dump(mode="json")
+
+    @app.post("/api/qa/preview")
+    def api_qa_preview(req: QARequest) -> dict[str, Any]:
+        """只跑检索，不调 LLM。用于调试 / 节省 token。"""
+        try:
+            items, warns = qa_retrieve(req)
+        except Exception as e:
+            logger.exception("QA preview 失败")
+            raise HTTPException(500, f"QA preview 失败: {e}")
+        return {
+            "ok": True,
+            "items": [it.model_dump(mode="json") for it in items],
+            "warnings": warns,
+            "context_chars": sum(len(it.body) for it in items),
+        }
 
     # ---------- 演进大盘（先做一个最简单的：按年份的仓库数 + 状态） ----------
 

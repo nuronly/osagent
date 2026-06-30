@@ -11,6 +11,10 @@ const fmtBytes = (n) => {
 };
 
 async function api(path, opts = {}) {
+  // 支持 body: object → 自动 JSON 序列化
+  if (opts.body && typeof opts.body === "object" && !(opts.body instanceof FormData)) {
+    opts = { ...opts, body: JSON.stringify(opts.body) };
+  }
   const resp = await fetch(path, {
     headers: { "Content-Type": "application/json" },
     ...opts,
@@ -236,6 +240,10 @@ async function openDrawer(repoId) {
   loadFactsIfExists(repoId);
   // 顺手检查报告是否已存在
   refreshReportStatus(repoId);
+  // 清空 QA 历史
+  qaResetHistory("qa-history");
+  $("#qa-status").textContent = "";
+  $("#qa-question").value = "";
 }
 
 async function refreshReportStatus(repoId) {
@@ -472,6 +480,10 @@ async function openCompareDrawer(a, b) {
   $("#btn-open-compare-md").disabled = true;
   $("#btn-open-compare-json").disabled = true;
   $("#compare-drawer").classList.add("open");
+  // 清空 QA 历史
+  qaResetHistory("qa-history-compare");
+  $("#qa-status-compare").textContent = "";
+  $("#qa-question-compare").value = "";
 
   // 查询是否已存在
   try {
@@ -573,6 +585,173 @@ $("#btn-build-compare").addEventListener("click", buildCompare);
 $("#btn-open-compare-html").addEventListener("click", openCompareHtml);
 $("#btn-open-compare-md").addEventListener("click", openCompareMd);
 $("#btn-open-compare-json").addEventListener("click", openCompareJson);
+
+// ===== QA（检索增强问答） =====
+
+function qaResetHistory(historyId) {
+  const el = document.getElementById(historyId);
+  if (el) el.innerHTML = "";
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/** 把答复里的 [1] / [1,2] 渲染成可点击 chip，外层基础富文本（保留代码块 / inline code）。 */
+function renderAnswer(text) {
+  // 1) 先转义 + 还原 `code` / ```code blocks```
+  let html = escapeHtml(text);
+  // ```code``` 代码块
+  html = html.replace(/```([\w-]*)\n([\s\S]*?)```/g, (_m, lang, code) => {
+    return `<pre><code class="lang-${escapeHtml(lang)}">${code}</code></pre>`;
+  });
+  // 反引号 inline code
+  html = html.replace(/`([^`\n]+)`/g, (_m, code) => `<code>${code}</code>`);
+  // 2) 把 [1] / [1,2] 替换成 chip
+  html = html.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (_m, group) => {
+    return group.split(",").map(n => {
+      const idx = n.trim();
+      return `<span class="qa-cite" data-cite="${idx}">[${idx}]</span>`;
+    }).join("");
+  });
+  return html;
+}
+
+function renderSourceLine(idx, s) {
+  let loc = "";
+  if (s.file) {
+    loc = `<span class="src-loc">${escapeHtml(s.file)}`;
+    if (s.start_line) loc += `:${s.start_line}-${s.end_line || s.start_line}`;
+    loc += "</span>";
+  }
+  const anchor = s.anchor ? `<span class="src-anchor">${escapeHtml(s.anchor)}</span>` : "";
+  const repo = s.repo_id ? `<span class="badge">${escapeHtml(s.repo_id)}</span> ` : "";
+  return `<li>[${idx}] ${repo}${escapeHtml(s.label || "")} ${anchor} ${loc} <span class="muted">(${escapeHtml(s.type)})</span></li>`;
+}
+
+function appendQaMsg(historyId, role, html, extra) {
+  const wrap = document.getElementById(historyId);
+  if (!wrap) return null;
+  const div = document.createElement("div");
+  div.className = `qa-msg ${role}`;
+  div.innerHTML = `<div class="qa-role">${role}</div><div class="qa-body">${html}</div>${extra || ""}`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+
+function buildSourcesBlock(resp) {
+  if (!resp.sources || resp.sources.length === 0) return "";
+  const lis = resp.sources.map((s, i) => renderSourceLine(i + 1, s)).join("");
+  let extra = `<div class="qa-sources"><b>引用</b>（${resp.sources.length} 条）<ol>${lis}</ol></div>`;
+  if (resp.warnings && resp.warnings.length) {
+    extra += `<div class="qa-warnings">⚠️ ${resp.warnings.map(escapeHtml).join(" · ")}</div>`;
+  }
+  if (resp.usage && resp.usage.total_tokens) {
+    extra += `<div class="qa-meta">model=${escapeHtml(resp.model)} · prompt=${resp.usage.prompt_tokens} · completion=${resp.usage.completion_tokens} · total=${resp.usage.total_tokens} · ${resp.latency_ms}ms</div>`;
+  }
+  return extra;
+}
+
+async function qaAsk(scope, payload, historyId, statusId, btn) {
+  appendQaMsg(historyId, "user", escapeHtml(payload.question));
+  const thinking = appendQaMsg(historyId, "assistant",
+    "<span class='qa-thinking'>思考中…（约 5–15 秒）</span>");
+  document.getElementById(statusId).textContent = "正在调用 DeepSeek…";
+  btn.disabled = true;
+  try {
+    const resp = await api("/api/qa", {
+      method: "POST",
+      body: { scope, ...payload },
+    });
+    // 移除"思考中"占位 → 重新渲染最终消息
+    thinking.remove();
+    const div = appendQaMsg(historyId, "assistant",
+      renderAnswer(resp.answer || "（空）"),
+      buildSourcesBlock(resp));
+    document.getElementById(statusId).textContent = "";
+    // 引用 chip 点击：滚到引用列表对应项并高亮
+    div.querySelectorAll(".qa-cite").forEach(c => {
+      c.addEventListener("click", () => {
+        const idx = parseInt(c.dataset.cite, 10) - 1;
+        const li = div.querySelectorAll(".qa-sources li")[idx];
+        if (li) {
+          li.scrollIntoView({ block: "center", behavior: "smooth" });
+          li.style.background = "rgba(96,165,250,.25)";
+          setTimeout(() => (li.style.background = ""), 1200);
+        }
+      });
+    });
+  } catch (e) {
+    thinking.remove();
+    appendQaMsg(historyId, "error", "❌ " + escapeHtml(e.message));
+    document.getElementById(statusId).textContent = "请求失败";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// 仓库详情聊天框
+function bindQaForRepo() {
+  const btn = $("#btn-qa-ask");
+  const textarea = $("#qa-question");
+  if (!btn || !textarea) return;
+  const submit = () => {
+    const q = textarea.value.trim();
+    if (!q || !currentRepoId) return;
+    textarea.value = "";
+    qaAsk("repo", { question: q, repo_id: currentRepoId },
+      "qa-history", "qa-status", btn);
+  };
+  btn.addEventListener("click", submit);
+  textarea.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      submit();
+    }
+  });
+  document.querySelectorAll("#drawer .qa-suggest .chip").forEach(c => {
+    c.addEventListener("click", () => {
+      textarea.value = c.dataset.q;
+      submit();
+    });
+  });
+}
+
+// 对比抽屉聊天框
+function bindQaForCompare() {
+  const btn = $("#btn-qa-ask-compare");
+  const textarea = $("#qa-question-compare");
+  if (!btn || !textarea) return;
+  const submit = () => {
+    const q = textarea.value.trim();
+    if (!q || !compareState.currentA || !compareState.currentB) return;
+    textarea.value = "";
+    qaAsk("compare", {
+      question: q,
+      repo_id_a: compareState.currentA,
+      repo_id_b: compareState.currentB,
+    }, "qa-history-compare", "qa-status-compare", btn);
+  };
+  btn.addEventListener("click", submit);
+  textarea.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      submit();
+    }
+  });
+  document.querySelectorAll("#compare-drawer .qa-suggest .chip").forEach(c => {
+    c.addEventListener("click", () => {
+      textarea.value = c.dataset.q;
+      submit();
+    });
+  });
+}
+
+bindQaForRepo();
+bindQaForCompare();
 
 // 默认加载概览
 loadOverview();

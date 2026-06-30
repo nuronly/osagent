@@ -43,6 +43,9 @@ app.add_typer(ingest_app, name="ingest")
 app.add_typer(analyzer_app, name="analyzer")
 app.add_typer(report_app, name="report")
 
+qa_app = typer.Typer(help="检索增强问答（RAG）")
+app.add_typer(qa_app, name="qa")
+
 
 @app.command("serve")
 def serve(
@@ -386,6 +389,77 @@ def report_compare(
     for k in ("md_path", "html_path", "json_path"):
         if k in out:
             console.print(f"  {k:10s} {out[k]}")
+
+
+# ============ qa ============
+
+@qa_app.command("ask")
+def qa_ask_cmd(
+    question: str = typer.Argument(..., help="问题文本"),
+    scope: str = typer.Option("repo", help="repo / compare / global"),
+    repo: str = typer.Option(None, "--repo", help="scope=repo 时必填"),
+    a: str = typer.Option(None, help="scope=compare 时的 A 仓库"),
+    b: str = typer.Option(None, help="scope=compare 时的 B 仓库"),
+    max_tokens: int = typer.Option(800, help="LLM 最大输出 token 数"),
+    temperature: float = typer.Option(0.1, help="采样温度"),
+    preview: bool = typer.Option(
+        False, "--preview", help="只跑检索不调 LLM"
+    ),
+) -> None:
+    """基于事实表的检索增强问答。
+
+    示例::
+
+        osagent qa ask "内存管理用了什么算法？" --repo 2024_001_xxx
+        osagent qa ask "syscall 设计本质区别？" --scope compare -a R1 -b R2
+    """
+    from .qa import ask as _ask, retrieve as _retrieve
+    from .schemas.qa import QARequest
+
+    if scope not in {"repo", "compare", "global"}:
+        console.print(f"[red]scope 必须是 repo/compare/global，得到: {scope}[/red]")
+        raise typer.Exit(2)
+
+    req = QARequest(
+        question=question, scope=scope,  # type: ignore[arg-type]
+        repo_id=repo, repo_id_a=a, repo_id_b=b,
+        max_tokens=max_tokens, temperature=temperature,
+    )
+
+    if preview:
+        items, warns = _retrieve(req)
+        console.print(f"[bold]检索到 {len(items)} 条上下文[/bold]，约 "
+                      f"{sum(len(it.body) for it in items):,} 字符")
+        for i, it in enumerate(items, start=1):
+            console.print(f"\n[cyan][{i}] {it.title}[/cyan]")
+            console.print(it.body[:400])
+        if warns:
+            console.print("\n[yellow]warnings:[/yellow]")
+            for w in warns:
+                console.print(f"  - {w}")
+        return
+
+    resp = _ask(req)
+    console.rule(f"[bold]Answer[/bold]  (model={resp.model}, latency={resp.latency_ms}ms)")
+    console.print(resp.answer)
+    console.rule("[bold]Sources[/bold]")
+    for i, s in enumerate(resp.sources, start=1):
+        loc = ""
+        if s.file:
+            loc = f" → {s.file}"
+            if s.start_line:
+                loc += f":{s.start_line}-{s.end_line or s.start_line}"
+        console.print(f"  [{i}] {s.label} ({s.type}){loc}")
+    if resp.warnings:
+        console.print("\n[yellow]warnings:[/yellow]")
+        for w in resp.warnings:
+            console.print(f"  - {w}")
+    if resp.usage.total_tokens:
+        console.print(
+            f"\ntokens: prompt={resp.usage.prompt_tokens} "
+            f"completion={resp.usage.completion_tokens} "
+            f"total={resp.usage.total_tokens}"
+        )
 
 
 if __name__ == "__main__":

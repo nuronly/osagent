@@ -134,6 +134,23 @@
         <span id="report-result" class="hint"></span>
       </div>
       <iframe id="report-frame" style="display:none;width:100%;height:560px;border:1px solid var(--border);border-radius:6px;margin-top:.6rem;background:#fff"></iframe>
+
+      <h4>💬 智能问答（RAG）</h4>
+      <p class="muted" style="margin:.2rem 0 .4rem;font-size:.85em">
+        基于事实表 + DeepSeek，所有结论挂引用，不会脑补。
+      </p>
+      <div class="qa-suggest">
+        <button class="chip" data-q="这个仓库的内存管理用了什么算法？涉及哪些关键数据结构？">内存管理算法</button>
+        <button class="chip" data-q="这个仓库实现了哪些子系统？分别用了什么技术？">实现了哪些子系统</button>
+        <button class="chip" data-q="这个仓库有多少个 syscall？分别属于哪些类别？">syscall 概览</button>
+        <button class="chip" data-q="这个仓库的开发历史是什么样的？有哪些关键里程碑？">开发历史</button>
+      </div>
+      <div id="qa-history" class="qa-history"></div>
+      <div class="qa-input">
+        <textarea id="qa-question" rows="2" placeholder="例如：scheduler 用了什么调度算法？"></textarea>
+        <button class="btn primary" id="btn-qa-ask">提问</button>
+      </div>
+      <div id="qa-status" class="hint"></div>
     </div>
   </aside>
 
@@ -153,6 +170,23 @@
       </div>
       <div id="compare-scores" class="cards" style="margin-bottom:.6rem"></div>
       <iframe id="compare-frame" style="display:none;width:100%;height:640px;border:1px solid var(--border);border-radius:6px;background:#fff"></iframe>
+
+      <h4>💬 智能问答（RAG）</h4>
+      <p class="muted" style="margin:.2rem 0 .4rem;font-size:.85em">
+        基于对比报告 + DeepSeek，问"A 和 B 在 syscall / 内存 / 调度 上的本质差异"等。
+      </p>
+      <div class="qa-suggest">
+        <button class="chip" data-q="两个仓库的 syscall 设计有什么本质区别？">syscall 本质区别</button>
+        <button class="chip" data-q="两个仓库的内存管理实现差异在哪？">内存管理差异</button>
+        <button class="chip" data-q="两个仓库的整体相似度由哪些维度构成？哪些是关键差异？">相似度构成</button>
+        <button class="chip" data-q="两个仓库是否同基线？规模和子系统覆盖如何？">同基线 & 覆盖度</button>
+      </div>
+      <div id="qa-history-compare" class="qa-history"></div>
+      <div class="qa-input">
+        <textarea id="qa-question-compare" rows="2" placeholder="例如：两个仓库的 scheduler 设计差异？"></textarea>
+        <button class="btn primary" id="btn-qa-ask-compare">提问</button>
+      </div>
+      <div id="qa-status-compare" class="hint"></div>
     </div>
   </aside>
 
