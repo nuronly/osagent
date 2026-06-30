@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="/static/report.css">
+</head>
+<body>
+
+<header class="report-header">
+  <div class="header-inner">
+    <a href="/" class="back-link" title="返回仪表盘">← 返回仪表盘</a>
+    <div class="header-meta">
+      <h1>
+        {{ team }}
+        <span class="muted-inline">·</span>
+        <span class="school">{{ school }}</span>
+      </h1>
+      <div class="header-sub">{{ sub_chips }}</div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-ghost" href="/api/repos/{{ repo_id }}/report.md" target="_blank" rel="noopener" title="下载 Markdown 原文">📥 MD</a>
+      <button class="btn btn-primary" onclick="window.print()" title="打印 / 导出 PDF (Cmd+P)">🖨 打印</button>
+    </div>
+  </div>
+</header>
+
+<section class="summary-strip">
+  <div class="summary-inner">
+    {{ summary_cards }}
+  </div>
+</section>
+
+<div class="layout">
+  <aside class="toc">
+    <div class="toc-inner">
+      <h3>目录</h3>
+      {{ toc }}
+    </div>
+  </aside>
+
+  <main class="report-body">
+    <article class="report-article">
+      {{ body_html }}
+    </article>
+    <footer class="report-footer">
+      由 osAgent 生成 · L1+L2 静态分析 · 抗幻觉事实表驱动
+    </footer>
+  </main>
+</div>
+
+<script src="/static/report.js"></script>
+</body>
+</html>

@@ -560,7 +560,294 @@ def create_app() -> FastAPI:
     def index() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
 
+    @app.get("/report", response_class=HTMLResponse)
+    def page_report(repo_id: str) -> HTMLResponse:
+        """独立报告页面（v0.7.2）。
+
+        新标签页打开，撑满浏览器宽度，左侧 sticky TOC + 右侧报告正文。
+        数据源：
+          - manifest entry → 头部学校/队伍/year/repo_url
+          - facts summary  → 顶部 4 张数字摘要卡
+          - reports/<id>.html → 抽出 <div class="container"> 正文，并扫 h2/h3 生成 TOC
+        """
+        # 1. 友好错误页
+        if not has_facts(repo_id):
+            return HTMLResponse(_render_report_error(
+                repo_id, "事实表未生成", "请先在仪表盘点'抽取事实'生成 facts，再点'生成报告'。"
+            ), status_code=404)
+        if not has_html(repo_id):
+            return HTMLResponse(_render_report_error(
+                repo_id, "HTML 报告未生成", "请回仪表盘点'📄 生成报告'按钮后再访问。"
+            ), status_code=404)
+
+        # 2. manifest entry（meta 头部用）
+        m = load_manifest()
+        entry = next((r for r in m.repos if r.repo_id == repo_id), None)
+
+        # 3. facts summary（顶部 4 张数字卡用）
+        facts = load_facts(repo_id)
+        summary_cards = _build_summary_cards(facts)
+
+        # 4. 读 reports HTML 并抽出正文 + TOC
+        raw_html = html_path(repo_id).read_text(encoding="utf-8")
+        body_html, toc = _extract_body_and_toc(raw_html)
+
+        # 5. 渲染模板
+        template = (STATIC_DIR / "report.html").read_text(encoding="utf-8")
+        return HTMLResponse(_fill_report_template(
+            template,
+            repo_id=repo_id,
+            entry=entry,
+            summary_cards=summary_cards,
+            toc=toc,
+            body_html=body_html,
+        ))
+
     return app
+
+
+# ============================================================
+# 独立报告页面（v0.7.2）的辅助函数
+# ============================================================
+
+def _esc(s: Any) -> str:
+    """HTML 转义。"""
+    import html as _h
+    return _h.escape("" if s is None else str(s))
+
+
+def _fmt_bytes(n: int | None) -> str:
+    if not n:
+        return "-"
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024:
+            return f"{n:.1f}{unit}" if unit != "B" else f"{n}B"
+        n = n / 1024  # type: ignore[assignment]
+    return f"{n:.1f}TB"
+
+
+def _fmt_num(n: Any) -> str:
+    if n is None:
+        return "-"
+    try:
+        return f"{int(n):,}"
+    except (TypeError, ValueError):
+        return str(n)
+
+
+def _build_summary_cards(facts) -> list[dict[str, str]]:  # noqa: ANN001
+    """从 facts 提炼 4 张数字摘要卡（首屏给老师看的"硬指标"）。"""
+    top_lang = facts.basics.languages[0].language if facts.basics.languages else "-"
+    subsystems = sorted({kf.feature for kf in facts.kernel_features})
+    return [
+        {
+            "label": "代码规模",
+            "value": _fmt_num(facts.basics.total_loc),
+            "unit": "LOC",
+            "hint": f"主语言 {top_lang}",
+        },
+        {
+            "label": "子系统",
+            "value": str(len(subsystems)),
+            "unit": "个",
+            "hint": "、".join(subsystems[:3]) if subsystems else "-",
+        },
+        {
+            "label": "syscalls",
+            "value": _fmt_num(facts.syscalls.count),
+            "unit": "个",
+            "hint": f"调用图节点 {len(facts.call_graph.nodes)}",
+        },
+        {
+            "label": "提交记录",
+            "value": _fmt_num(facts.dev_history.commits_total),
+            "unit": "commits",
+            "hint": f"{facts.dev_history.contributors_total} 位贡献者",
+        },
+    ]
+
+
+def _extract_body_and_toc(raw_html: str) -> tuple[str, list[dict[str, str]]]:
+    """从 report.html 中抽出 <div class="container"> 正文 + h2/h3 列表。
+
+    使用 stdlib html.parser，零新依赖。
+    返回 (body_html, [{"level": "2|3", "id": "anchor", "text": "标题"}, ...])
+    """
+    from html.parser import HTMLParser
+
+    class _Extractor(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__(convert_charrefs=False)
+            self.depth = 0
+            self.in_container = False
+            self.container_depth = 0
+            self.body_parts: list[str] = []
+            self.toc: list[dict[str, str]] = []
+            self._capture_heading: str | None = None  # "2"|"3"
+            self._heading_text: list[str] = []
+            self._heading_id: str = ""
+            self._auto_id_seed = 0
+
+        def _attrs_to_str(self, attrs: list[tuple[str, str | None]]) -> str:
+            parts = []
+            for k, v in attrs:
+                if v is None:
+                    parts.append(k)
+                else:
+                    parts.append(f'{k}="{_esc(v)}"')
+            return (" " + " ".join(parts)) if parts else ""
+
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            self.depth += 1
+            attrs_dict = dict(attrs)
+            if not self.in_container:
+                if tag == "div" and "container" in (attrs_dict.get("class") or ""):
+                    self.in_container = True
+                    self.container_depth = self.depth
+                return
+            # 跳过 footer
+            if tag == "footer":
+                self._skip_footer = True  # type: ignore[attr-defined]
+            if tag in ("h2", "h3"):
+                self._capture_heading = tag[1]
+                self._heading_text = []
+                # 给标题强行加 id（若已有用已有的）
+                hid = attrs_dict.get("id")
+                if not hid:
+                    self._auto_id_seed += 1
+                    hid = f"toc-{self._auto_id_seed}"
+                    attrs = list(attrs) + [("id", hid)]
+                self._heading_id = hid
+            self.body_parts.append(f"<{tag}{self._attrs_to_str(attrs)}>")
+
+        def handle_endtag(self, tag: str) -> None:
+            if self.in_container and self.depth == self.container_depth and tag == "div":
+                self.in_container = False
+                self.depth -= 1
+                return
+            if self.in_container:
+                self.body_parts.append(f"</{tag}>")
+                if self._capture_heading and tag == f"h{self._capture_heading}":
+                    self.toc.append({
+                        "level": self._capture_heading,
+                        "id": self._heading_id,
+                        "text": "".join(self._heading_text).strip(),
+                    })
+                    self._capture_heading = None
+            self.depth -= 1
+
+        def handle_data(self, data: str) -> None:
+            if self.in_container:
+                self.body_parts.append(data)
+                if self._capture_heading:
+                    self._heading_text.append(data)
+
+        def handle_entityref(self, name: str) -> None:
+            if self.in_container:
+                self.body_parts.append(f"&{name};")
+
+        def handle_charref(self, name: str) -> None:
+            if self.in_container:
+                self.body_parts.append(f"&#{name};")
+
+    p = _Extractor()
+    p.feed(raw_html)
+    body = "".join(p.body_parts).strip()
+    # 去掉尾部的 <footer>...</footer> ——后端生成的 HTML 末尾有"由 osAgent 生成"那段
+    import re as _re
+    body = _re.sub(r"<footer\b[^>]*>.*?</footer>", "", body, flags=_re.S | _re.I)
+    return body, p.toc
+
+
+def _fill_report_template(
+    template: str,
+    *,
+    repo_id: str,
+    entry,  # noqa: ANN001  RepoEntry | None
+    summary_cards: list[dict[str, str]],
+    toc: list[dict[str, str]],
+    body_html: str,
+) -> str:
+    """把变量灌进 report.html 模板字符串（用 {{ key }} 占位，规避 Python format 与 CSS 冲突）。"""
+    team = (entry.team if entry else repo_id) or repo_id
+    school = (entry.school if entry else "") or ""
+    year = (entry.year if entry else "") or ""
+    contest = (entry.contest if entry else "") or ""
+    track = (entry.track if entry else "") or ""
+    repo_url = (entry.repo_url if entry else "") or ""
+
+    # 顶部 4 张数字卡
+    cards_html = "".join([
+        f'<div class="summary-card">'
+        f'  <div class="card-label">{_esc(c["label"])}</div>'
+        f'  <div class="card-value">{_esc(c["value"])}<span class="card-unit">{_esc(c["unit"])}</span></div>'
+        f'  <div class="card-hint">{_esc(c["hint"])}</div>'
+        f'</div>'
+        for c in summary_cards
+    ])
+
+    # TOC 列表
+    if toc:
+        toc_html = "<ul>" + "".join([
+            f'<li class="toc-lvl-{_esc(item["level"])}">'
+            f'<a href="#{_esc(item["id"])}">{_esc(item["text"])}</a>'
+            f'</li>'
+            for item in toc
+        ]) + "</ul>"
+    else:
+        toc_html = '<p class="toc-empty muted">（无章节）</p>'
+
+    sub_chips = []
+    if year:
+        sub_chips.append(f'<span class="chip">{_esc(year)}</span>')
+    if contest:
+        sub_chips.append(f'<span class="chip">{_esc(contest)}</span>')
+    if track:
+        sub_chips.append(f'<span class="chip">{_esc(track)}</span>')
+    if repo_url:
+        sub_chips.append(
+            f'<a class="chip chip-link" href="{_esc(repo_url)}" target="_blank" rel="noopener">🔗 仓库</a>'
+        )
+
+    repls = {
+        "{{ title }}": f"{team} · 分析报告",
+        "{{ team }}": _esc(team),
+        "{{ school }}": _esc(school),
+        "{{ sub_chips }}": "".join(sub_chips),
+        "{{ repo_id }}": _esc(repo_id),
+        "{{ summary_cards }}": cards_html,
+        "{{ toc }}": toc_html,
+        "{{ body_html }}": body_html,  # 已是 trusted html（自己后端生成）
+    }
+    out = template
+    for k, v in repls.items():
+        out = out.replace(k, v)
+    return out
+
+
+def _render_report_error(repo_id: str, title: str, hint: str) -> str:
+    """报告页友好错误模板（独立、最小依赖）。"""
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>报告未就绪 · {_esc(repo_id)}</title>
+<style>
+body {{ font-family: -apple-system, "PingFang SC", sans-serif; background: #f5f6fa;
+        display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }}
+.box {{ background: white; padding: 2.5rem 3rem; border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0,0,0,.06); text-align: center; max-width: 480px; }}
+h1 {{ margin: 0 0 .6rem; color: #b45309; font-size: 1.4rem; }}
+p {{ color: #4b5563; line-height: 1.6; }}
+code {{ background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: .9em; }}
+a {{ display: inline-block; margin-top: 1.4rem; padding: .55rem 1.2rem;
+     background: #2563eb; color: white; text-decoration: none; border-radius: 6px; }}
+a:hover {{ background: #1d4ed8; }}
+</style></head><body>
+<div class="box">
+  <h1>⚠️ {_esc(title)}</h1>
+  <p>仓库 <code>{_esc(repo_id)}</code></p>
+  <p>{_esc(hint)}</p>
+  <a href="/">← 返回仪表盘</a>
+</div>
+</body></html>"""
 
 
 app = create_app()

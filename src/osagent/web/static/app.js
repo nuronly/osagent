@@ -357,8 +357,6 @@ async function openDrawer(repoId) {
   $("#facts-content").textContent = "";
   $("#analyze-progress").style.display = "none";
   $("#report-result").textContent = "";
-  $("#report-frame").style.display = "none";
-  $("#report-frame").src = "about:blank";
   $("#btn-open-html").disabled = true;
   $("#btn-open-md").disabled = true;
   $("#drawer").classList.add("open");
@@ -509,11 +507,9 @@ async function buildReport() {
     const parts = [];
     if (r.md_chars != null) parts.push(`md ${(r.md_chars / 1024).toFixed(1)}KB`);
     if (r.html_chars != null) parts.push(`html ${(r.html_chars / 1024).toFixed(1)}KB`);
-    out.textContent = "已生成：" + parts.join(" / ");
+    out.textContent = `✅ 已生成 ${parts.join(" / ")}，点 🔗 查看报告`;
     $("#btn-open-html").disabled = false;
     $("#btn-open-md").disabled = false;
-    // 自动加载到 iframe 预览
-    openReportHtml();
   } catch (e) {
     out.textContent = "失败：" + e.message;
   } finally {
@@ -521,12 +517,14 @@ async function buildReport() {
   }
 }
 
+// v0.7.2：从 iframe 嵌入改成新标签页打开独立报告页（/report）
 function openReportHtml() {
   if (!currentRepoId) return;
-  const url = `/api/repos/${encodeURIComponent(currentRepoId)}/report.html?t=${Date.now()}`;
-  const frame = $("#report-frame");
-  frame.src = url;
-  frame.style.display = "block";
+  window.open(
+    `/report?repo_id=${encodeURIComponent(currentRepoId)}`,
+    "_blank",
+    "noopener"
+  );
 }
 
 function openReportMd() {
