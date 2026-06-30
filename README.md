@@ -1,6 +1,11 @@
 # osAgent
 演示视频和ppt：
+视频：
 https://pan.baidu.com/s/1uBHX08PdH665WkpLePishw?pwd=1111
+提取码: 1111
+PPT：
+https://pan.baidu.com/s/1BUffpTGAu4cjnQv1zyBnCw?pwd=1111 
+提取码: 1111
 
 > 面向小型操作系统的分析比对智能体系统
 > 服务对象：全国大学生操作系统比赛（OS Kernel 赛道）评审与组委会
