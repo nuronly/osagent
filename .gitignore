@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# 工具缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 环境与密钥（重要！）
+.env
+.env.*
+!.env.example
+
+# 数据与产物
+data/repos/
+data/cache/
+data/facts/
+data/index/
+data/reports/
+logs/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 用户私有文件（不进仓库）
+仓库和api

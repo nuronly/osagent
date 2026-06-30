@@ -1,0 +1,71 @@
+[project]
+name = "osagent"
+version = "0.1.0"
+description = "面向小型操作系统的分析比对智能体系统 (OS Kernel 赛道)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "lishibo", email = "lishibo@xiaohongshu.com" },
+]
+
+dependencies = [
+    # 基础
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "python-dotenv>=1.0",
+    "loguru>=0.7",
+    "typer>=0.12",
+    "rich>=13.7",
+    "httpx>=0.27",
+    "tenacity>=8.3",
+    "tqdm>=4.66",
+    "eval-type-backport>=0.2;python_version<'3.10'",
+
+    # 数据
+    "openpyxl>=3.1",
+    "pandas>=2.2",
+
+    # Git / 仓库分析
+    "gitpython>=3.1",
+
+    # LLM
+    "openai>=1.40",          # DeepSeek 兼容 OpenAI 协议
+
+    # 后续阶段（先声明，按需 import）
+    # "tree-sitter>=0.22",
+    # "tree-sitter-languages>=1.10",
+    # "langgraph>=0.2",
+    # "fastapi>=0.115",
+    # "uvicorn[standard]>=0.30",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+osagent = "osagent.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/osagent"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
