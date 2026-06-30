@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-06-30T20:25:05.468692",
+  "generated_at": "2026-06-30T20:30:42.724837",
   "source_xlsx": "/Users/lishibo/Desktop/osAgent/collected-data.xlsx",
   "total": 168,
   "repos": [
@@ -2101,13 +2101,13 @@
       "repo_url": "https://gitlab.eduxiji.net/educg-group-36002-2710490/T202510003995291-2331",
       "repo_id": "2025_001_undefined",
       "host": "gitlab.eduxiji.net",
-      "status": "pending",
-      "local_path": null,
-      "default_branch": null,
-      "head_commit": null,
-      "size_bytes": null,
-      "file_count": null,
-      "cloned_at": null,
+      "status": "ok",
+      "local_path": "data/repos/2025/2025_001_undefined",
+      "default_branch": "master",
+      "head_commit": "06f5953e6c2df6a316959972b6b78db78a0db5b6",
+      "size_bytes": 165850758,
+      "file_count": 6733,
+      "cloned_at": "2026-06-30T20:31:41.418378",
       "error_msg": null
     },
     {

@@ -10,6 +10,50 @@ const fmtBytes = (n) => {
   return (n / 1024 / 1024).toFixed(1) + " MB";
 };
 
+const fmtNum = (n) => (n == null ? "-" : Number(n).toLocaleString());
+
+const escapeHtml = (s) =>
+  String(s ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+// "2 天前" / "刚刚" / "3 小时前" — 输入 ISO string 或 null
+function fmtRelativeTime(iso) {
+  if (!iso) return "-";
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return "-";
+  const diff = (Date.now() - t) / 1000;
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)} 天前`;
+  if (diff < 86400 * 365) return `${Math.floor(diff / 86400 / 30)} 个月前`;
+  return `${Math.floor(diff / 86400 / 365)} 年前`;
+}
+
+const STATUS_META = {
+  ok:          { icon: "✅", label: "已克隆", cls: "ok" },
+  pending:     { icon: "⏸",  label: "待克隆", cls: "pending" },
+  unreachable: { icon: "❌", label: "不可达", cls: "fail" },
+  timeout:     { icon: "⏱",  label: "超时",   cls: "fail" },
+  error:       { icon: "⚠️", label: "出错",   cls: "fail" },
+};
+
+async function copyToClipboard(text, srcBtn) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+  }
+  if (srcBtn) {
+    const old = srcBtn.textContent;
+    srcBtn.textContent = "✓ 已复制";
+    setTimeout(() => (srcBtn.textContent = old), 1200);
+  }
+}
+
 async function api(path, opts = {}) {
   // 支持 body: object → 自动 JSON 序列化
   if (opts.body && typeof opts.body === "object" && !(opts.body instanceof FormData)) {
@@ -216,10 +260,101 @@ $("#btn-next").addEventListener("click", () => {
 
 // ===== 抽屉（仓库详情） =====
 let currentRepoId = null;
+
+/**
+ * 渲染仓库基本信息：身份头 + 链接 + 状态指标 + 进阶细节 + 错误条
+ * 字段来自 GET /api/manifest/repos/{repo_id}
+ */
+function renderRepoSummary(d) {
+  const meta = STATUS_META[d.status] || { icon: "·", label: d.status || "-", cls: "" };
+  const shortHash = d.head_commit ? d.head_commit.slice(0, 7) : null;
+  const hostShort = (d.repo_url || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
+
+  // 出错条件
+  const errBanner = d.error_msg
+    ? `<div class="error-banner">⚠️ ${escapeHtml(d.error_msg)}</div>`
+    : "";
+
+  // 本地实际存在 vs status 不一致
+  const inconsistent = (d.local_exists === false && d.status === "ok")
+    ? `<div class="warn-banner">⚠ status=ok 但本地路径不存在</div>` : "";
+
+  // local_path 行（仅 ok / 有 local_path 时显示）
+  const localRow = d.local_path
+    ? `<div class="repo-info-row">
+         <span class="k">本地路径</span>
+         <code class="mono ellipsis" title="${escapeHtml(d.local_path)}">${escapeHtml(d.local_path)}</code>
+         <button class="btn ghost mini" data-copy="${escapeHtml(d.local_path)}">📋</button>
+       </div>` : "";
+
+  // head_commit + branch 一行
+  const commitRow = (shortHash || d.default_branch)
+    ? `<div class="repo-info-row">
+         <span class="k">HEAD</span>
+         ${shortHash ? `<code class="mono">${shortHash}</code>` : '<span class="muted">-</span>'}
+         ${d.default_branch ? `<span class="branch-tag">${escapeHtml(d.default_branch)}</span>` : ""}
+       </div>` : "";
+
+  $("#repo-summary").innerHTML = `
+    <div class="repo-meta-head">
+      <div class="repo-chips">
+        <span class="chip year">${d.year ?? "-"}</span>
+        <span class="chip">${escapeHtml(d.contest || "")}</span>
+        <span class="chip">${escapeHtml(d.track || "")}</span>
+      </div>
+      <div class="repo-school">
+        <span class="emoji">🏫</span>
+        <b>${escapeHtml(d.school || "未知学校")}</b>
+        <span class="sep">·</span>
+        <span class="muted">队伍</span>
+        <b>${escapeHtml(d.team || "未知队伍")}</b>
+      </div>
+      <div class="repo-url-row">
+        <span class="emoji">🔗</span>
+        <a class="repo-url" href="${escapeHtml(d.repo_url || "#")}" target="_blank" rel="noopener"
+           title="${escapeHtml(d.repo_url || "")}">${escapeHtml(hostShort || "-")}</a>
+        <button class="btn ghost mini" data-copy="${escapeHtml(d.repo_url || "")}" title="复制 URL">📋</button>
+      </div>
+    </div>
+
+    ${errBanner}
+    ${inconsistent}
+
+    <div class="repo-stat-grid">
+      <div class="repo-stat">
+        <span class="label">状态</span>
+        <span class="value"><span class="status-pill ${meta.cls}">${meta.icon} ${meta.label}</span></span>
+      </div>
+      <div class="repo-stat">
+        <span class="label">文件数</span>
+        <span class="value">${fmtNum(d.file_count)}</span>
+      </div>
+      <div class="repo-stat">
+        <span class="label">大小</span>
+        <span class="value">${fmtBytes(d.size_bytes)}</span>
+      </div>
+      <div class="repo-stat">
+        <span class="label">克隆于</span>
+        <span class="value" title="${escapeHtml(d.cloned_at || "")}">${fmtRelativeTime(d.cloned_at)}</span>
+      </div>
+    </div>
+
+    ${commitRow}
+    ${localRow}
+  `;
+
+  // 复制按钮绑定（事件委托）
+  $$("#repo-summary [data-copy]").forEach((b) => {
+    b.addEventListener("click", () => copyToClipboard(b.dataset.copy, b));
+  });
+}
+
 async function openDrawer(repoId) {
   currentRepoId = repoId;
   $("#drawer-title").textContent = repoId;
-  $("#drawer-content").textContent = "加载中…";
+  $("#repo-summary").innerHTML = '<div class="muted">加载中…</div>';
+  $("#repo-raw").open = false;
+  $("#drawer-content").textContent = "";
   $("#clone-result").textContent = "";
   $("#analyze-result").textContent = "";
   $("#facts-content").textContent = "";
@@ -232,9 +367,12 @@ async function openDrawer(repoId) {
   $("#drawer").classList.add("open");
   try {
     const data = await api(`/api/manifest/repos/${encodeURIComponent(repoId)}`);
+    renderRepoSummary(data);
     $("#drawer-content").textContent = JSON.stringify(data, null, 2);
   } catch (e) {
-    $("#drawer-content").textContent = "错误：" + e.message;
+    $("#repo-summary").innerHTML =
+      `<div class="error-banner">加载失败：${escapeHtml(e.message)}</div>`;
+    $("#drawer-content").textContent = "";
   }
   // 顺手加载已有事实表（如果存在）
   loadFactsIfExists(repoId);

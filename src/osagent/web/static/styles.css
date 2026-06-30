@@ -507,3 +507,174 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
 }
 .confirm-body label input { cursor: pointer; }
+
+/* ===========================================================
+   v0.7.1：仓库详情抽屉 — 结构化展示
+   =========================================================== */
+
+.repo-summary {
+  margin: 4px 0 8px;
+}
+
+/* 头部：chips + 学校/队伍 + URL */
+.repo-meta-head {
+  padding: 12px 14px;
+  background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+.repo-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 8px;
+}
+.repo-chips .chip {
+  font-size: 11px; line-height: 1;
+  padding: 4px 8px;
+  background: rgba(96,165,250,.10);
+  color: var(--accent);
+  border: 1px solid rgba(96,165,250,.30);
+  border-radius: 999px;
+  cursor: default;
+  pointer-events: none;
+}
+.repo-chips .chip.year {
+  background: rgba(52,211,153,.12);
+  color: var(--accent-2);
+  border-color: rgba(52,211,153,.35);
+  font-weight: 600;
+}
+.repo-school {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.repo-school .emoji { font-size: 15px; }
+.repo-school .sep { color: var(--muted); margin: 0 4px; }
+.repo-school .muted { font-size: 12px; }
+.repo-url-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px;
+}
+.repo-url-row .emoji { font-size: 14px; }
+.repo-url {
+  color: var(--accent);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 360px;
+}
+.repo-url:hover { text-decoration: underline; }
+
+/* 状态统计 4 卡 */
+.repo-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.repo-stat {
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: center;
+}
+.repo-stat .label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.repo-stat .value {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* 状态 pill */
+.status-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.status-pill.ok      { background: rgba(52,211,153,.15); color: var(--accent-2); }
+.status-pill.pending { background: rgba(251,191,36,.15); color: var(--warn); }
+.status-pill.fail    { background: rgba(248,113,113,.15); color: var(--danger); }
+
+/* 进阶信息行 */
+.repo-info-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 5px;
+}
+.repo-info-row .k {
+  color: var(--muted);
+  min-width: 60px;
+  font-size: 11px;
+}
+.repo-info-row .ellipsis {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.branch-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  background: rgba(96,165,250,.12);
+  color: var(--accent);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+/* 迷你按钮 */
+.btn.mini {
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* 错误条 / 警告条 */
+.error-banner {
+  margin: 6px 0;
+  padding: 8px 10px;
+  background: rgba(248,113,113,.10);
+  color: var(--danger);
+  border: 1px solid rgba(248,113,113,.30);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.warn-banner {
+  margin: 6px 0;
+  padding: 8px 10px;
+  background: rgba(251,191,36,.10);
+  color: var(--warn);
+  border: 1px solid rgba(251,191,36,.30);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+/* 折叠完整 JSON */
+.repo-raw {
+  margin: 4px 0 12px;
+  font-size: 12px;
+}
+.repo-raw summary {
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px 0;
+  user-select: none;
+}
+.repo-raw summary:hover { color: var(--accent); }
+.repo-raw[open] summary { color: var(--accent); margin-bottom: 4px; }
+.repo-raw pre { margin: 0; max-height: 280px; overflow: auto; }
