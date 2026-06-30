@@ -1435,13 +1435,13 @@
       "repo_url": "https://gitlab.eduxiji.net/educg-group-26010-2376550/T202410269992492-843",
       "repo_id": "2024_002_ECNU九队",
       "host": "gitlab.eduxiji.net",
-      "status": "pending",
-      "local_path": null,
-      "default_branch": null,
-      "head_commit": null,
-      "size_bytes": null,
-      "file_count": null,
-      "cloned_at": null,
+      "status": "ok",
+      "local_path": "data/repos/2024/2024_002_ECNU九队",
+      "default_branch": "main",
+      "head_commit": "bf192034924ccfd295b765313d77cffae703398c",
+      "size_bytes": 2432467,
+      "file_count": 180,
+      "cloned_at": "2026-06-30T14:19:05.193992",
       "error_msg": null
     },
     {
@@ -1453,14 +1453,14 @@
       "repo_url": "https://gitlab.eduxiji.net/educg-group-26010-2376550/T202410287992637-1454",
       "repo_id": "2024_003_学到东西就算胜利队",
       "host": "gitlab.eduxiji.net",
-      "status": "pending",
-      "local_path": null,
+      "status": "error",
+      "local_path": "data/repos/2024/2024_003_学到东西就算胜利队",
       "default_branch": null,
       "head_commit": null,
       "size_bytes": null,
       "file_count": null,
       "cloned_at": null,
-      "error_msg": null
+      "error_msg": "fatal: could not read Username for 'https://gitlab.eduxiji.net': Device not configured"
     },
     {
       "year": 2024,
