@@ -42,6 +42,18 @@ app.add_typer(ingest_app, name="ingest")
 app.add_typer(analyzer_app, name="analyzer")
 
 
+@app.command("serve")
+def serve(
+    host: str = typer.Option("127.0.0.1", help="绑定地址；公网访问改 0.0.0.0"),
+    port: int = typer.Option(8000, help="端口"),
+    reload: bool = typer.Option(False, "--reload", help="开发模式自动重载"),
+) -> None:
+    """启动 Web 仪表盘（FastAPI + 静态前端）。"""
+    import uvicorn
+    console.print(f"[green]osAgent Web 启动:[/green] http://{host}:{port}")
+    uvicorn.run("osagent.web.app:app", host=host, port=port, reload=reload)
+
+
 # ============ llm ============
 
 @llm_app.command("ping")

@@ -44,6 +44,7 @@ osAgent/
 │   ├── agent/                       # Agent 编排（后续 LangGraph）
 │   ├── retrieval/                   # RAG（后续）
 │   ├── report/                      # 报告生成（后续）
+│   ├── web/                         # FastAPI + 静态前端（极简仪表盘）
 │   └── schemas/                     # 数据契约（事实表/Card/Report）
 ├── scripts/                         # 一次性脚本
 ├── tests/
@@ -66,9 +67,27 @@ osAgent/
 ## 当前可用 CLI
 
 ```bash
-osagent llm ping             # 测试 DeepSeek API 连通性
-osagent manifest build       # 由 collected-data.xlsx 生成 manifest.json
-osagent manifest stats       # 查看年份/学校分布
-osagent ingest probe -n 5    # 抽样拉取 N 个仓库测试连通性
-osagent ingest clone-all     # 批量拉取所有仓库（耗时较长）
+osagent llm ping                  # 测试 DeepSeek API 连通性
+osagent manifest build            # 由 collected-data.xlsx 生成 manifest.json
+osagent manifest stats            # 查看年份/学校分布
+osagent manifest show --year 2021 # 按年份查看仓库
+osagent ingest probe -n 5         # 抽样拉取 N 个仓库测试连通性
+osagent ingest clone-all          # 批量拉取所有仓库（耗时较长）
+osagent analyzer list-tools       # 列出 MCP Static Analyzer 9 个工具契约
+osagent serve --port 8000         # 启动 Web 仪表盘
 ```
+
+## Web 仪表盘
+
+```bash
+osagent serve                     # 默认 http://127.0.0.1:8000
+# 或开发模式（改代码自动重载）：
+osagent serve --reload
+```
+
+界面包含三个 tab：
+- **概览**：数据集卡片、年份分布柱状图、每年仓库规模表
+- **仓库**：按年份/状态/关键字过滤，点"查看"看详情、可单独触发克隆
+- **LLM**：一键 ping DeepSeek，看模型 / token 用量
+
+API 文档（Swagger UI）：`http://127.0.0.1:8000/docs`

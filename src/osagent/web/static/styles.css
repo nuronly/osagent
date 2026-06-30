@@ -1,0 +1,143 @@
+/* osAgent 极简仪表盘样式 */
+:root {
+  --bg: #0f1115;
+  --panel: #161922;
+  --panel-2: #1e2230;
+  --border: #2a2f3d;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #60a5fa;
+  --accent-2: #34d399;
+  --warn: #fbbf24;
+  --danger: #f87171;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* 顶栏 */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  position: sticky; top: 0; z-index: 10;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.logo { font-size: 22px; color: var(--accent); }
+.title { font-size: 18px; font-weight: 600; }
+.subtitle { color: var(--muted); font-size: 12px; }
+.nav { display: flex; gap: 6px; align-items: center; }
+.nav-btn {
+  background: transparent; color: var(--muted);
+  border: 1px solid transparent; padding: 6px 14px;
+  border-radius: 6px; cursor: pointer; font-size: 13px;
+}
+.nav-btn:hover { color: var(--text); background: var(--panel-2); }
+.nav-btn.active { color: var(--accent); border-color: var(--border); background: var(--panel-2); }
+.nav-link { color: var(--muted); text-decoration: none; font-size: 12px; margin-left: 8px; }
+.nav-link:hover { color: var(--accent); }
+
+/* 主区 */
+main { padding: 24px; max-width: 1280px; margin: 0 auto; }
+.view { display: none; }
+.view.active { display: block; }
+h2 { margin-top: 0; font-weight: 600; font-size: 18px; }
+h3 { margin-top: 28px; font-weight: 500; color: var(--muted); font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* 卡片 */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px;
+}
+.card-label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+.card-value { font-size: 24px; font-weight: 600; color: var(--accent); }
+.card-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* 柱状图（纯 CSS） */
+.bar-chart { display: flex; gap: 14px; align-items: flex-end; height: 180px;
+  padding: 16px; background: var(--panel); border-radius: 8px; border: 1px solid var(--border); }
+.bar-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%; background: linear-gradient(180deg, var(--accent), #2563eb);
+  border-radius: 4px 4px 0 0; min-height: 4px;
+  transition: opacity .2s;
+}
+.bar:hover { opacity: 0.8; }
+.bar-label { font-size: 12px; color: var(--muted); }
+.bar-value { font-size: 12px; color: var(--text); font-weight: 600; }
+
+/* 表格 */
+.table { width: 100%; border-collapse: collapse; margin-top: 8px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.table th, .table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.table th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; background: var(--panel-2); }
+.table tbody tr:hover { background: var(--panel-2); }
+.table tbody tr:last-child td { border-bottom: none; }
+.table td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+/* 状态徽章 */
+.badge { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; }
+.badge.ok { background: rgba(52,211,153,.15); color: var(--accent-2); }
+.badge.pending { background: rgba(251,191,36,.12); color: var(--warn); }
+.badge.unreachable, .badge.error, .badge.timeout { background: rgba(248,113,113,.15); color: var(--danger); }
+
+/* 过滤栏 */
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.filters select, .filters input {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  padding: 6px 10px; border-radius: 6px; font-size: 13px;
+}
+.filters input { flex: 1; min-width: 220px; }
+
+/* 按钮 */
+.btn {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); color: #0a0d13; border-color: var(--accent); font-weight: 600; }
+.btn.primary:hover { background: #93c5fd; color: #0a0d13; }
+.btn.ghost { background: transparent; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* 分页 */
+.pager { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 16px; }
+
+/* 代码块 */
+.code {
+  background: #0a0d13; border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--accent-2); overflow-x: auto; max-height: 600px;
+  white-space: pre-wrap; word-break: break-all;
+}
+
+.hint { color: var(--muted); font-size: 12px; }
+.muted { color: var(--muted); }
+.actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; }
+
+/* 抽屉 */
+.drawer {
+  position: fixed; top: 0; right: 0; width: 480px; height: 100vh;
+  background: var(--panel); border-left: 1px solid var(--border);
+  transform: translateX(100%); transition: transform .25s ease;
+  display: flex; flex-direction: column; z-index: 20; box-shadow: -8px 0 32px rgba(0,0,0,.4);
+}
+.drawer.open { transform: translateX(0); }
+.drawer-head { padding: 14px 18px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center; }
+.drawer-head h3 { margin: 0; text-transform: none; color: var(--text); font-size: 15px; }
+.drawer-body { padding: 16px 18px; overflow-y: auto; flex: 1; }
+
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>osAgent · 仪表盘</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⌬</span>
+      <span class="title">osAgent</span>
+      <span class="subtitle">小型操作系统分析比对智能体</span>
+    </div>
+    <nav class="nav">
+      <button data-view="overview" class="nav-btn active">概览</button>
+      <button data-view="repos" class="nav-btn">仓库</button>
+      <button data-view="llm" class="nav-btn">LLM</button>
+      <a class="nav-link" href="/docs" target="_blank">API 文档 ↗</a>
+    </nav>
+  </header>
+
+  <main id="app">
+    <!-- 概览 -->
+    <section data-view="overview" class="view active">
+      <h2>数据集概览</h2>
+      <div id="stats-cards" class="cards"></div>
+
+      <h3>按年份分布</h3>
+      <div class="bar-chart" id="year-chart"></div>
+
+      <h3>每年仓库规模</h3>
+      <table class="table" id="yearly-table">
+        <thead>
+          <tr><th>年份</th><th>总数</th><th>已克隆</th><th>平均文件数</th><th>平均大小 (KB)</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="actions">
+        <button id="btn-rebuild" class="btn">🔄 重建 manifest</button>
+        <span id="rebuild-result" class="hint"></span>
+      </div>
+    </section>
+
+    <!-- 仓库列表 -->
+    <section data-view="repos" class="view">
+      <h2>仓库列表</h2>
+      <div class="filters">
+        <select id="filter-year">
+          <option value="">全部年份</option>
+        </select>
+        <select id="filter-status">
+          <option value="">全部状态</option>
+          <option value="pending">pending</option>
+          <option value="ok">ok</option>
+          <option value="unreachable">unreachable</option>
+          <option value="timeout">timeout</option>
+          <option value="error">error</option>
+        </select>
+        <input id="filter-q" type="text" placeholder="搜索 team / school / repo_id" />
+        <button class="btn" id="btn-search">查询</button>
+        <span id="repo-total" class="hint"></span>
+      </div>
+
+      <table class="table" id="repo-table">
+        <thead>
+          <tr>
+            <th>年份</th><th>repo_id</th><th>学校</th><th>队伍</th>
+            <th>状态</th><th>文件数</th><th>大小</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="pager">
+        <button class="btn" id="btn-prev">‹ 上一页</button>
+        <span id="page-info">1</span>
+        <button class="btn" id="btn-next">下一页 ›</button>
+      </div>
+    </section>
+
+    <!-- LLM -->
+    <section data-view="llm" class="view">
+      <h2>LLM 连通性</h2>
+      <p class="muted">当前模型：<code id="llm-model">deepseek-chat</code>（DeepSeek 兼容 OpenAI 协议）</p>
+      <button class="btn primary" id="btn-ping">Ping DeepSeek</button>
+      <pre class="code" id="ping-output">点击按钮测试</pre>
+    </section>
+  </main>
+
+  <!-- 仓库详情抽屉 -->
+  <aside id="drawer" class="drawer">
+    <div class="drawer-head">
+      <h3 id="drawer-title">详情</h3>
+      <button class="btn ghost" id="drawer-close">×</button>
+    </div>
+    <div class="drawer-body">
+      <pre class="code" id="drawer-content"></pre>
+      <div class="actions">
+        <button class="btn" id="btn-clone">📥 克隆 (depth=1)</button>
+        <button class="btn ghost" id="btn-clone-full">完整克隆</button>
+        <span id="clone-result" class="hint"></span>
+      </div>
+    </div>
+  </aside>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
