@@ -14,6 +14,13 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from ..analyzer import (
+    analyze_by_repo_id,
+    facts_path,
+    get_manager,
+    has_facts,
+    load_facts,
+)
 from ..config import settings
 from ..ingest import (
     build_manifest,
@@ -119,6 +126,113 @@ def create_app() -> FastAPI:
         clone_one(entry, force=force, depth=depth)
         save_manifest(m)
         return entry.model_dump(mode="json")
+
+    # ---------- 静态分析（异步） ----------
+
+    @app.post("/api/repos/{repo_id}/analyze")
+    def api_repo_analyze(
+        repo_id: str,
+        level: str = "L2",
+        force: bool = False,
+        budget: float = 30.0,
+    ) -> dict[str, Any]:
+        """提交一个分析任务到 JobManager，立刻返回 job_id。前端再轮询进度。"""
+        if level not in {"L1", "L2", "L3"}:
+            raise HTTPException(400, f"level 必须是 L1/L2/L3，得到: {level}")
+
+        # 已存在且不强制 → 不开 job
+        if has_facts(repo_id) and not force:
+            return {
+                "ok": True,
+                "cached": True,
+                "repo_id": repo_id,
+                "facts_path": str(facts_path(repo_id)),
+            }
+
+        m = load_manifest()
+        entry = next((r for r in m.repos if r.repo_id == repo_id), None)
+        if not entry:
+            raise HTTPException(404, f"repo_id 未找到: {repo_id}")
+        if not entry.local_path:
+            raise HTTPException(
+                400, f"repo {repo_id} 尚未克隆（status={entry.status.value}），请先 clone"
+            )
+
+        mgr = get_manager()
+
+        def _run(job, cb):  # noqa: ANN001
+            facts = analyze_by_repo_id(
+                repo_id,
+                level=level,  # type: ignore[arg-type]
+                on_progress=cb,
+                l2_budget_seconds=budget,
+            )
+            return {
+                "repo_id": facts.repo_id,
+                "summary": facts.summary_for_embedding,
+                "facts_path": str(facts_path(facts.repo_id)),
+            }
+
+        job_id = mgr.submit(
+            kind="analyze",
+            payload={"repo_id": repo_id, "level": level, "budget": budget, "force": force},
+            fn=_run,
+        )
+        return {"ok": True, "cached": False, "job_id": job_id, "repo_id": repo_id}
+
+    @app.get("/api/jobs/{job_id}")
+    def api_job_status(job_id: str) -> dict[str, Any]:
+        job = get_manager().get(job_id)
+        if job is None:
+            raise HTTPException(404, f"job 未找到: {job_id}")
+        d = job.to_dict()
+        if job.status == "done":
+            d["result"] = job.result
+        return d
+
+    @app.get("/api/jobs")
+    def api_job_list(limit: int = 30) -> dict[str, Any]:
+        jobs = get_manager().list_recent(limit=limit)
+        return {"items": [j.to_dict() for j in jobs]}
+
+    # ---------- 事实表查询 ----------
+
+    @app.get("/api/repos/{repo_id}/facts")
+    def api_repo_facts(repo_id: str) -> dict[str, Any]:
+        if not has_facts(repo_id):
+            raise HTTPException(
+                404,
+                f"事实表不存在，请先 POST /api/repos/{repo_id}/analyze",
+            )
+        f = load_facts(repo_id)
+        return f.model_dump(mode="json")
+
+    @app.get("/api/repos/{repo_id}/facts/summary")
+    def api_repo_facts_summary(repo_id: str) -> dict[str, Any]:
+        """轻量摘要：避免一次拉整张表（前端列表用）。"""
+        if not has_facts(repo_id):
+            raise HTTPException(404, "facts 未生成")
+        f = load_facts(repo_id)
+        return {
+            "repo_id": f.repo_id,
+            "extracted_at": f.extracted_at.isoformat(),
+            "head_commit": f.head_commit,
+            "languages": [s.model_dump() for s in f.basics.languages[:5]],
+            "total_loc": f.basics.total_loc,
+            "arch": f.basics.arch,
+            "build": f.basics.build.kind,
+            "base_template": f.basics.base_template,
+            "subsystems": sorted({kf.feature for kf in f.kernel_features}),
+            "syscall_count": f.syscalls.count,
+            "function_node_count": len(f.call_graph.nodes),
+            "dev_history": {
+                "commits": f.dev_history.commits_total,
+                "contributors": f.dev_history.contributors_total,
+                "first": f.dev_history.first_commit_at.isoformat() if f.dev_history.first_commit_at else None,
+                "last": f.dev_history.last_commit_at.isoformat() if f.dev_history.last_commit_at else None,
+            },
+            "summary": f.summary_for_embedding,
+        }
 
     # ---------- LLM ----------
 

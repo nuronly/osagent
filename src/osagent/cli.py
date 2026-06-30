@@ -14,7 +14,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from .analyzer import list_mcp_tools
+from .analyzer import analyze_by_repo_id, has_facts, list_mcp_tools, load_facts
 from .config import settings
 from .ingest import (
     build_manifest,
@@ -198,6 +198,90 @@ def analyzer_list_tools() -> None:
     for spec in tools:
         t.add_row(spec.name, spec.description)
     console.print(t)
+
+
+@analyzer_app.command("analyze")
+def analyzer_analyze(
+    repo_id: str = typer.Argument(..., help="manifest 中的 repo_id"),
+    level: str = typer.Option("L2", help="分析深度: L1 / L2 / L3"),
+    budget: float = typer.Option(30.0, help="L2 函数索引时间预算（秒）"),
+    force: bool = typer.Option(False, "--force", help="即使事实表已存在也重算"),
+) -> None:
+    """对单个仓库执行静态分析，生成事实表。"""
+    if level not in {"L1", "L2", "L3"}:
+        console.print(f"[red]level 必须是 L1/L2/L3，得到: {level}[/red]")
+        raise typer.Exit(1)
+
+    if has_facts(repo_id) and not force:
+        console.print(
+            f"[yellow]事实表已存在: {repo_id}，加 --force 重算；"
+            f"现仅打印摘要[/yellow]"
+        )
+        f = load_facts(repo_id)
+        console.print(f.summary_for_embedding)
+        return
+
+    def _on_progress(stage: str, msg: str, pct: int) -> None:
+        console.print(f"[cyan][{pct:3d}%][/cyan] [{stage}] {msg}")
+
+    facts = analyze_by_repo_id(
+        repo_id,
+        level=level,  # type: ignore[arg-type]
+        on_progress=_on_progress,
+        l2_budget_seconds=budget,
+    )
+    console.print(f"[green]done.[/green]")
+    console.print(facts.summary_for_embedding, markup=False)
+
+
+@analyzer_app.command("show")
+def analyzer_show(
+    repo_id: str = typer.Argument(...),
+    section: str = typer.Option(
+        "summary",
+        help="summary / basics / subsystems / syscalls / functions / history",
+    ),
+) -> None:
+    """查看已生成的事实表。"""
+    if not has_facts(repo_id):
+        console.print(f"[red]事实表不存在，请先 `osagent analyzer analyze {repo_id}`[/red]")
+        raise typer.Exit(1)
+    f = load_facts(repo_id)
+    sec = section.lower()
+    if sec == "summary":
+        console.print(f.summary_for_embedding, markup=False)
+    elif sec == "basics":
+        console.print_json(f.basics.model_dump_json(indent=2))
+    elif sec == "subsystems":
+        t = Table(title=f"Subsystems ({len(f.kernel_features)})")
+        t.add_column("feature", style="cyan")
+        t.add_column("files")
+        t.add_column("confidence")
+        for kf in f.kernel_features:
+            t.add_row(kf.feature, str(len(kf.files)), kf.confidence)
+        console.print(t)
+    elif sec == "syscalls":
+        t = Table(title=f"Syscalls ({f.syscalls.count})")
+        t.add_column("name", style="cyan")
+        t.add_column("handler_file")
+        for s in f.syscalls.items[:50]:
+            t.add_row(s.name, s.handler_file or "-")
+        console.print(t)
+        if f.syscalls.count > 50:
+            console.print(f"... 共 {f.syscalls.count} 条，仅展示前 50")
+    elif sec == "functions":
+        console.print(f"函数节点总数: {len(f.call_graph.nodes)}")
+        for n in f.call_graph.nodes[:20]:
+            console.print(f"  {n.qualified_name}  ({n.file}:{n.start_line})")
+    elif sec == "history":
+        h = f.dev_history
+        console.print(
+            f"commits={h.commits_total}, contributors={h.contributors_total}, "
+            f"first={h.first_commit_at}, last={h.last_commit_at}"
+        )
+    else:
+        console.print(f"[red]未知 section: {section}[/red]")
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

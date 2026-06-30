@@ -141,3 +141,48 @@ h3 { margin-top: 28px; font-weight: 500; color: var(--muted); font-size: 14px; t
 
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+
+/* ===== Analyze 进度条 ===== */
+.progress {
+  margin: 12px 0;
+  height: 22px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  width: 0%;
+  transition: width 0.3s ease;
+}
+.progress-text {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 2px;
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drawer-body h4 {
+  margin: 20px 0 8px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+#analyze-level {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+#facts-content:empty { display: none; }

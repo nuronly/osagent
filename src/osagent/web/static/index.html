@@ -97,12 +97,30 @@
       <button class="btn ghost" id="drawer-close">×</button>
     </div>
     <div class="drawer-body">
+      <h4>基本信息</h4>
       <pre class="code" id="drawer-content"></pre>
       <div class="actions">
         <button class="btn" id="btn-clone">📥 克隆 (depth=1)</button>
         <button class="btn ghost" id="btn-clone-full">完整克隆</button>
         <span id="clone-result" class="hint"></span>
       </div>
+
+      <h4>静态分析（事实表）</h4>
+      <div class="actions">
+        <select id="analyze-level">
+          <option value="L1">L1 — 快速画像（秒级）</option>
+          <option value="L2" selected>L2 — 内核洞察（推荐）</option>
+          <option value="L3">L3 — 结构签名（含 MinHash）</option>
+        </select>
+        <button class="btn primary" id="btn-analyze">⚙️ 开始分析</button>
+        <button class="btn ghost" id="btn-analyze-force">强制重算</button>
+        <span id="analyze-result" class="hint"></span>
+      </div>
+      <div id="analyze-progress" class="progress" style="display:none">
+        <div class="progress-bar" id="analyze-bar"></div>
+        <div class="progress-text" id="analyze-msg"></div>
+      </div>
+      <pre class="code" id="facts-content"></pre>
     </div>
   </aside>
 

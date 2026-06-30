@@ -212,6 +212,9 @@ async function openDrawer(repoId) {
   $("#drawer-title").textContent = repoId;
   $("#drawer-content").textContent = "加载中…";
   $("#clone-result").textContent = "";
+  $("#analyze-result").textContent = "";
+  $("#facts-content").textContent = "";
+  $("#analyze-progress").style.display = "none";
   $("#drawer").classList.add("open");
   try {
     const data = await api(`/api/manifest/repos/${encodeURIComponent(repoId)}`);
@@ -219,6 +222,33 @@ async function openDrawer(repoId) {
   } catch (e) {
     $("#drawer-content").textContent = "错误：" + e.message;
   }
+  // 顺手加载已有事实表（如果存在）
+  loadFactsIfExists(repoId);
+}
+async function loadFactsIfExists(repoId) {
+  try {
+    const f = await api(`/api/repos/${encodeURIComponent(repoId)}/facts/summary`);
+    renderFacts(f);
+    $("#analyze-result").textContent = `事实表已存在，提取于 ${new Date(f.extracted_at).toLocaleString()}`;
+  } catch {
+    // 没有就静默
+  }
+}
+function renderFacts(f) {
+  const text =
+    `仓库: ${f.repo_id}\n` +
+    `语言占比: ${f.languages.map(l => `${l.language}(${l.percent}%)`).join(", ")}\n` +
+    `总 LOC: ${f.total_loc}\n` +
+    `架构: ${f.arch.join(", ")}\n` +
+    `构建: ${f.build}\n` +
+    `基线模板: ${f.base_template || "—"}\n` +
+    `子系统: ${f.subsystems.join(", ") || "—"}\n` +
+    `syscall 数: ${f.syscall_count}\n` +
+    `函数节点: ${f.function_node_count}\n` +
+    `Git: ${f.dev_history.commits} commits / ${f.dev_history.contributors} contributors\n` +
+    `时间跨度: ${f.dev_history.first || "?"} → ${f.dev_history.last || "?"}\n` +
+    `\n${f.summary}`;
+  $("#facts-content").textContent = text;
 }
 $("#drawer-close").addEventListener("click", () => $("#drawer").classList.remove("open"));
 
@@ -240,6 +270,66 @@ async function cloneCurrent(depth) {
 }
 $("#btn-clone").addEventListener("click", () => cloneCurrent(1));
 $("#btn-clone-full").addEventListener("click", () => cloneCurrent(0));
+
+// ===== 静态分析（异步 + 进度轮询） =====
+async function startAnalyze(force) {
+  if (!currentRepoId) return;
+  const level = $("#analyze-level").value;
+  const out = $("#analyze-result");
+  const bar = $("#analyze-bar");
+  const msg = $("#analyze-msg");
+  const wrap = $("#analyze-progress");
+
+  $("#btn-analyze").disabled = true;
+  $("#btn-analyze-force").disabled = true;
+  out.textContent = "提交中…";
+  wrap.style.display = "block";
+  bar.style.width = "0%";
+  msg.textContent = "准备";
+
+  try {
+    const url = `/api/repos/${encodeURIComponent(currentRepoId)}/analyze?level=${level}&force=${force ? "true" : "false"}`;
+    const r = await api(url, { method: "POST" });
+    if (r.cached) {
+      out.textContent = "命中缓存，直接加载事实表";
+      bar.style.width = "100%";
+      msg.textContent = "完成（缓存）";
+      await loadFactsIfExists(currentRepoId);
+      return;
+    }
+    out.textContent = `任务已提交 (${r.job_id})`;
+    await pollJob(r.job_id);
+  } catch (e) {
+    out.textContent = "失败：" + e.message;
+  } finally {
+    $("#btn-analyze").disabled = false;
+    $("#btn-analyze-force").disabled = false;
+  }
+}
+
+async function pollJob(jobId) {
+  const bar = $("#analyze-bar");
+  const msg = $("#analyze-msg");
+  while (true) {
+    await new Promise((r) => setTimeout(r, 600));
+    const j = await api(`/api/jobs/${jobId}`);
+    bar.style.width = `${j.progress.pct}%`;
+    msg.textContent = `[${j.progress.stage}] ${j.progress.msg}`;
+    if (j.status === "done") {
+      $("#analyze-result").textContent = "✅ 分析完成";
+      await loadFactsIfExists(currentRepoId);
+      return;
+    }
+    if (j.status === "error") {
+      $("#analyze-result").textContent = "❌ 失败";
+      msg.textContent = (j.error || "").split("\n")[0];
+      return;
+    }
+  }
+}
+
+$("#btn-analyze").addEventListener("click", () => startAnalyze(false));
+$("#btn-analyze-force").addEventListener("click", () => startAnalyze(true));
 
 // ===== LLM =====
 $("#btn-ping").addEventListener("click", async () => {
