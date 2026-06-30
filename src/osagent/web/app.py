@@ -21,7 +21,20 @@ from ..analyzer import (
     has_facts,
     load_facts,
 )
-from ..report import build_report, has_html, has_md, html_path, md_path
+from ..report import (
+    build_compare_report,
+    build_report,
+    compare_html_path,
+    compare_json_path,
+    compare_md_path,
+    has_compare_html,
+    has_compare_json,
+    has_compare_md,
+    has_html,
+    has_md,
+    html_path,
+    md_path,
+)
 from ..config import settings
 from ..ingest import (
     build_manifest,
@@ -286,6 +299,66 @@ def create_app() -> FastAPI:
             "has_md": has_md(repo_id),
             "has_html": has_html(repo_id),
         }
+
+    # ---------- 两仓库对比 ----------
+
+    @app.post("/api/compare")
+    def api_compare_build(
+        a: str = Query(..., description="A 仓库 ID"),
+        b: str = Query(..., description="B 仓库 ID"),
+        fmt: str = "both",
+    ) -> dict[str, Any]:
+        """生成两仓库对比报告（md + html + json）。"""
+        if fmt not in {"md", "html", "both"}:
+            raise HTTPException(400, f"fmt 必须是 md/html/both，得到: {fmt}")
+        if a == b:
+            raise HTTPException(400, "两个 repo_id 不能相同")
+        for rid in (a, b):
+            if not has_facts(rid):
+                raise HTTPException(
+                    400, f"事实表不存在: {rid}. 请先 POST /api/repos/{rid}/analyze"
+                )
+        try:
+            out = build_compare_report(a, b, fmt=fmt)  # type: ignore[arg-type]
+        except Exception as e:
+            logger.exception("build_compare_report 失败")
+            raise HTTPException(500, str(e))
+        return {"ok": True, **out}
+
+    @app.get("/api/compare/status")
+    def api_compare_status(a: str = Query(...), b: str = Query(...)) -> dict[str, Any]:
+        return {
+            "a": a,
+            "b": b,
+            "has_facts_a": has_facts(a),
+            "has_facts_b": has_facts(b),
+            "has_md": has_compare_md(a, b),
+            "has_html": has_compare_html(a, b),
+            "has_json": has_compare_json(a, b),
+        }
+
+    @app.get("/api/compare.md", response_class=PlainTextResponse)
+    def api_compare_md(a: str = Query(...), b: str = Query(...)) -> PlainTextResponse:
+        if not has_compare_md(a, b):
+            raise HTTPException(404, "Markdown 对比报告不存在，先 POST /api/compare")
+        return PlainTextResponse(
+            compare_md_path(a, b).read_text(encoding="utf-8"),
+            media_type="text/markdown; charset=utf-8",
+        )
+
+    @app.get("/api/compare.html", response_class=HTMLResponse)
+    def api_compare_html_api(a: str = Query(...), b: str = Query(...)) -> HTMLResponse:
+        if not has_compare_html(a, b):
+            raise HTTPException(404, "HTML 对比报告不存在，先 POST /api/compare")
+        return HTMLResponse(compare_html_path(a, b).read_text(encoding="utf-8"))
+
+    @app.get("/api/compare.json")
+    def api_compare_json(a: str = Query(...), b: str = Query(...)) -> dict[str, Any]:
+        """直接返回结构化 CompareReport（前端可直接渲染雷达图等）。"""
+        if not has_compare_json(a, b):
+            raise HTTPException(404, "JSON 对比报告不存在，先 POST /api/compare")
+        import json as _json
+        return _json.loads(compare_json_path(a, b).read_text(encoding="utf-8"))
 
     # ---------- LLM ----------
 

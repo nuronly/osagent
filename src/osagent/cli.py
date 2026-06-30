@@ -350,5 +350,43 @@ def report_build_all(
             console.print(f"  [red]fail[/red] {rid}  {e}")
 
 
+@report_app.command("compare")
+def report_compare(
+    repo_id_a: str = typer.Argument(..., help="A 仓库 ID"),
+    repo_id_b: str = typer.Argument(..., help="B 仓库 ID"),
+    fmt: str = typer.Option("both", help="md / html / both"),
+    show_scores: bool = typer.Option(True, help="打印评分表"),
+) -> None:
+    """生成两仓库对比报告（md + html + json 同时落盘到 data/reports/compare/）。"""
+    from .report import build_compare_report
+
+    if repo_id_a == repo_id_b:
+        console.print("[red]两个 repo_id 不能相同[/red]")
+        raise typer.Exit(2)
+
+    try:
+        out = build_compare_report(repo_id_a, repo_id_b, fmt=fmt)  # type: ignore[arg-type]
+    except FileNotFoundError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]生成失败：{e}[/red]")
+        raise typer.Exit(1)
+
+    if show_scores:
+        from rich.table import Table
+        table = Table(title=f"{repo_id_a}  vs  {repo_id_b}", show_lines=False)
+        table.add_column("维度", style="cyan")
+        table.add_column("分值", justify="right", style="bold")
+        table.add_row("整体相似度", f"{out['overall']:.2f}")
+        table.add_row("子系统平均", f"{out['subsystem_avg']:.2f}")
+        console.print(table)
+
+    console.print("[green]已生成对比报告[/green]")
+    for k in ("md_path", "html_path", "json_path"):
+        if k in out:
+            console.print(f"  {k:10s} {out[k]}")
+
+
 if __name__ == "__main__":
     app()

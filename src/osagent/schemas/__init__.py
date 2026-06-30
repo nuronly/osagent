@@ -18,6 +18,17 @@ from .facts import (
     TechHighlight,
 )
 from .manifest import Manifest, RepoEntry, RepoStatus
+from .compare import (
+    BasicsDiff,
+    CompareReport,
+    CompareScores,
+    DevDiff,
+    RepoMeta,
+    ScalarDiff,
+    SetDiff,
+    SubsystemDiff,
+    SyscallDiff,
+)
 
 __all__ = [
     "Manifest",
@@ -39,4 +50,14 @@ __all__ = [
     "Syscall",
     "SyscallTable",
     "TechHighlight",
+    # compare
+    "BasicsDiff",
+    "CompareReport",
+    "CompareScores",
+    "DevDiff",
+    "RepoMeta",
+    "ScalarDiff",
+    "SetDiff",
+    "SubsystemDiff",
+    "SyscallDiff",
 ]

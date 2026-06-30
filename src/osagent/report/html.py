@@ -141,6 +141,14 @@ footer {
     font-size: 0.85rem;
     text-align: center;
 }
+
+/* compare 报告：进度条字符（█·）用等宽字体显示并去除底色 */
+table td code {
+    background: transparent;
+    color: var(--accent);
+    padding: 0;
+    letter-spacing: -1px;
+}
 """
 
 

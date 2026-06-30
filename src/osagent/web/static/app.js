@@ -161,12 +161,14 @@ async function fetchAndRenderRepos() {
 
 function renderRepoRows(rows) {
   if (!rows.length) {
-    $("#repo-table tbody").innerHTML = `<tr><td colspan="8" class="muted">无结果</td></tr>`;
+    $("#repo-table tbody").innerHTML = `<tr><td colspan="9" class="muted">无结果</td></tr>`;
     return;
   }
   $("#repo-table tbody").innerHTML = rows
-    .map(
-      (r) => `<tr>
+    .map((r) => {
+      const checked = compareState.selected.has(r.repo_id) ? "checked" : "";
+      return `<tr>
+        <td><input type="checkbox" class="cmp-pick" data-repo="${r.repo_id}" ${checked}></td>
         <td>${r.year}</td>
         <td class="mono">${r.repo_id}</td>
         <td>${r.school}</td>
@@ -175,12 +177,15 @@ function renderRepoRows(rows) {
         <td>${r.file_count || "-"}</td>
         <td>${fmtBytes(r.size_bytes)}</td>
         <td><button class="btn ghost" data-repo="${r.repo_id}">查看</button></td>
-      </tr>`
-    )
+      </tr>`;
+    })
     .join("");
 
   $$("#repo-table button[data-repo]").forEach((b) =>
     b.addEventListener("click", () => openDrawer(b.dataset.repo))
+  );
+  $$("#repo-table input.cmp-pick").forEach((cb) =>
+    cb.addEventListener("change", () => onComparePickToggle(cb))
   );
 }
 
@@ -406,6 +411,168 @@ $("#btn-ping").addEventListener("click", async () => {
     btn.disabled = false;
   }
 });
+
+// ===== 两仓库对比 =====
+const compareState = {
+  selected: new Set(), // 顺序无关
+  order: [],           // 按勾选顺序保持 A→B
+  currentA: null,
+  currentB: null,
+};
+
+function onComparePickToggle(cb) {
+  const id = cb.dataset.repo;
+  if (cb.checked) {
+    if (compareState.selected.size >= 2) {
+      cb.checked = false;
+      alert("最多只能选 2 个仓库进行对比。请先取消已选项。");
+      return;
+    }
+    compareState.selected.add(id);
+    compareState.order.push(id);
+  } else {
+    compareState.selected.delete(id);
+    compareState.order = compareState.order.filter((x) => x !== id);
+  }
+  refreshCompareUI();
+}
+
+function refreshCompareUI() {
+  const n = compareState.selected.size;
+  const btn = $("#btn-compare-selected");
+  btn.textContent = `🆚 对比所选（${n}/2）`;
+  btn.disabled = n !== 2;
+  $("#btn-clear-selection").disabled = n === 0;
+}
+
+function clearSelection() {
+  compareState.selected.clear();
+  compareState.order = [];
+  $$("#repo-table input.cmp-pick").forEach((cb) => (cb.checked = false));
+  refreshCompareUI();
+}
+
+$("#btn-clear-selection").addEventListener("click", clearSelection);
+
+$("#btn-compare-selected").addEventListener("click", () => {
+  if (compareState.order.length !== 2) return;
+  const [a, b] = compareState.order;
+  openCompareDrawer(a, b);
+});
+
+async function openCompareDrawer(a, b) {
+  compareState.currentA = a;
+  compareState.currentB = b;
+  $("#compare-title").textContent = `对比：${a}  vs  ${b}`;
+  $("#compare-result").textContent = "";
+  $("#compare-scores").innerHTML = "";
+  $("#compare-frame").style.display = "none";
+  $("#compare-frame").src = "about:blank";
+  $("#btn-open-compare-html").disabled = true;
+  $("#btn-open-compare-md").disabled = true;
+  $("#btn-open-compare-json").disabled = true;
+  $("#compare-drawer").classList.add("open");
+
+  // 查询是否已存在
+  try {
+    const params = `a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`;
+    const s = await api(`/api/compare/status?${params}`);
+    $("#btn-open-compare-html").disabled = !s.has_html;
+    $("#btn-open-compare-md").disabled = !s.has_md;
+    $("#btn-open-compare-json").disabled = !s.has_json;
+    if (s.has_html) {
+      $("#compare-result").textContent = "已存在历史报告，可直接打开";
+      await loadCompareScores(a, b);
+    } else if (!s.has_facts_a || !s.has_facts_b) {
+      const miss = [];
+      if (!s.has_facts_a) miss.push(a);
+      if (!s.has_facts_b) miss.push(b);
+      $("#compare-result").textContent = `⚠️ 以下仓库尚无事实表：${miss.join("、")}（请先到对应仓库详情运行分析）`;
+    }
+  } catch {}
+}
+
+$("#compare-close").addEventListener("click", () => $("#compare-drawer").classList.remove("open"));
+
+async function buildCompare() {
+  const a = compareState.currentA, b = compareState.currentB;
+  if (!a || !b) return;
+  const btn = $("#btn-build-compare");
+  const out = $("#compare-result");
+  btn.disabled = true;
+  out.textContent = "生成中（一般 < 1 秒）…";
+  try {
+    const params = `a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`;
+    const r = await api(`/api/compare?${params}`, { method: "POST" });
+    out.textContent =
+      `已生成：整体相似度 ${r.overall.toFixed(2)} · 子系统平均 ${r.subsystem_avg.toFixed(2)}` +
+      (r.md_chars ? ` · md ${(r.md_chars/1024).toFixed(1)}KB` : "") +
+      (r.html_chars ? ` / html ${(r.html_chars/1024).toFixed(1)}KB` : "");
+    $("#btn-open-compare-html").disabled = false;
+    $("#btn-open-compare-md").disabled = false;
+    $("#btn-open-compare-json").disabled = false;
+    await loadCompareScores(a, b);
+    openCompareHtml();
+  } catch (e) {
+    out.textContent = "失败：" + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function loadCompareScores(a, b) {
+  try {
+    const params = `a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`;
+    const j = await api(`/api/compare.json?${params}`);
+    const s = j.scores || {};
+    const order = [
+      ["overall", "整体相似度"],
+      ["subsystem_avg", "子系统平均"],
+      ["subsystem_coverage", "子系统覆盖"],
+      ["syscall", "syscall"],
+      ["base_template", "基线"],
+      ["scale", "规模接近度"],
+    ];
+    $("#compare-scores").innerHTML = order
+      .map(([k, label]) => {
+        const v = (s[k] ?? 0);
+        const pct = Math.round(v * 100);
+        return `<div class="card">
+          <div class="card-label">${label}</div>
+          <div class="card-value">${v.toFixed(2)}</div>
+          <div class="card-sub">${pct}%</div>
+        </div>`;
+      })
+      .join("");
+  } catch {}
+}
+
+function openCompareHtml() {
+  const a = compareState.currentA, b = compareState.currentB;
+  if (!a || !b) return;
+  const params = `a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}&t=${Date.now()}`;
+  $("#compare-frame").src = `/api/compare.html?${params}`;
+  $("#compare-frame").style.display = "block";
+}
+
+function openCompareMd() {
+  const a = compareState.currentA, b = compareState.currentB;
+  if (!a || !b) return;
+  const params = `a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}&t=${Date.now()}`;
+  window.open(`/api/compare.md?${params}`, "_blank");
+}
+
+function openCompareJson() {
+  const a = compareState.currentA, b = compareState.currentB;
+  if (!a || !b) return;
+  const params = `a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`;
+  window.open(`/api/compare.json?${params}`, "_blank");
+}
+
+$("#btn-build-compare").addEventListener("click", buildCompare);
+$("#btn-open-compare-html").addEventListener("click", openCompareHtml);
+$("#btn-open-compare-md").addEventListener("click", openCompareMd);
+$("#btn-open-compare-json").addEventListener("click", openCompareJson);
 
 // 默认加载概览
 loadOverview();

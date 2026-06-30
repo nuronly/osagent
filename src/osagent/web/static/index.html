@@ -62,11 +62,15 @@
         <input id="filter-q" type="text" placeholder="搜索 team / school / repo_id" />
         <button class="btn" id="btn-search">查询</button>
         <span id="repo-total" class="hint"></span>
+        <span style="flex:1"></span>
+        <button class="btn primary" id="btn-compare-selected" disabled>🆚 对比所选（0/2）</button>
+        <button class="btn ghost" id="btn-clear-selection" disabled>清空选择</button>
       </div>
 
       <table class="table" id="repo-table">
         <thead>
           <tr>
+            <th style="width:34px"></th>
             <th>年份</th><th>repo_id</th><th>学校</th><th>队伍</th>
             <th>状态</th><th>文件数</th><th>大小</th><th>操作</th>
           </tr>
@@ -130,6 +134,25 @@
         <span id="report-result" class="hint"></span>
       </div>
       <iframe id="report-frame" style="display:none;width:100%;height:560px;border:1px solid var(--border);border-radius:6px;margin-top:.6rem;background:#fff"></iframe>
+    </div>
+  </aside>
+
+  <!-- 两仓库对比抽屉 -->
+  <aside id="compare-drawer" class="drawer">
+    <div class="drawer-head">
+      <h3 id="compare-title">两仓库对比</h3>
+      <button class="btn ghost" id="compare-close">×</button>
+    </div>
+    <div class="drawer-body">
+      <div class="actions" style="margin-bottom:.5rem">
+        <button class="btn primary" id="btn-build-compare">🆚 生成对比报告</button>
+        <button class="btn" id="btn-open-compare-html" disabled>🔗 打开 HTML</button>
+        <button class="btn ghost" id="btn-open-compare-md" disabled>📝 查看 Markdown</button>
+        <button class="btn ghost" id="btn-open-compare-json" disabled>🧾 JSON</button>
+        <span id="compare-result" class="hint"></span>
+      </div>
+      <div id="compare-scores" class="cards" style="margin-bottom:.6rem"></div>
+      <iframe id="compare-frame" style="display:none;width:100%;height:640px;border:1px solid var(--border);border-radius:6px;background:#fff"></iframe>
     </div>
   </aside>
 
