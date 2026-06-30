@@ -18,6 +18,7 @@
       <button data-view="repos" class="nav-btn">仓库</button>
       <button data-view="llm" class="nav-btn">LLM</button>
       <a class="nav-link" href="/docs" target="_blank">API 文档 ↗</a>
+      <button id="btn-open-import" class="btn primary" style="margin-left:0.8rem">📥 导入仓库</button>
     </nav>
   </header>
 
@@ -106,6 +107,7 @@
       <div class="actions">
         <button class="btn" id="btn-clone">📥 克隆 (depth=1)</button>
         <button class="btn ghost" id="btn-clone-full">完整克隆</button>
+        <button class="btn danger" id="btn-delete-repo" title="从 manifest 删除该仓库">🗑 删除</button>
         <span id="clone-result" class="hint"></span>
       </div>
 
@@ -189,6 +191,85 @@
       <div id="qa-status-compare" class="hint"></div>
     </div>
   </aside>
+
+  <!-- 导入仓库弹窗 -->
+  <div id="import-modal" class="modal" aria-hidden="true">
+    <div class="modal-mask" data-modal-close></div>
+    <div class="modal-panel">
+      <div class="modal-head">
+        <h3>导入仓库</h3>
+        <button class="btn ghost" data-modal-close>×</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="tab-btn active" data-tab="bulk">📊 批量 Excel</button>
+        <button class="tab-btn" data-tab="single">➕ 单个仓库</button>
+      </div>
+
+      <!-- 批量 Excel tab -->
+      <div class="tab-pane active" data-tab="bulk">
+        <p class="muted" style="margin:.2rem 0 .6rem">
+          支持 7 列格式：<b>年份 / 赛事 / 子赛事 / 学校 / 队伍名称 / 仓库地址</b>。<br>
+          <b>合并策略：</b>URL 已存在的仓库会自动跳过（保留旧 repo_id 与运行时状态），新仓续号追加。导入前会自动备份当前 manifest。
+        </p>
+
+        <label class="file-drop" id="file-drop">
+          <input type="file" id="import-file" accept=".xlsx,.xls" hidden>
+          <div class="file-drop-inner">
+            <span class="big">📁</span>
+            <div>拖拽 <b>.xlsx</b> 到这里，或点击选择文件</div>
+            <div class="muted" id="file-chosen">尚未选择文件</div>
+          </div>
+        </label>
+
+        <div class="actions">
+          <button class="btn" id="btn-import-preview">👀 预览（dry-run）</button>
+          <button class="btn primary" id="btn-import-confirm" disabled>✅ 确认导入</button>
+          <span id="import-status" class="hint"></span>
+        </div>
+
+        <div id="import-report" class="import-report" hidden></div>
+      </div>
+
+      <!-- 单个仓库 tab -->
+      <div class="tab-pane" data-tab="single" hidden>
+        <p class="muted" style="margin:.2rem 0 .6rem">
+          手工添加一条仓库到 manifest。带 * 为必填。
+        </p>
+        <form id="add-repo-form" class="add-repo-form">
+          <label>年份*  <input type="number" name="year" min="2021" max="2099" required placeholder="如 2026"></label>
+          <label>学校*  <input type="text" name="school" required placeholder="如 北京大学"></label>
+          <label>队伍名*  <input type="text" name="team" required placeholder="如 NeoOS"></label>
+          <label>仓库 URL*  <input type="url" name="repo_url" required placeholder="https://..."></label>
+          <label>赛事  <input type="text" name="contest" value="操作系统赛"></label>
+          <label>子赛事  <input type="text" name="track" value="内核实现赛道"></label>
+          <div class="actions" style="grid-column:1/-1">
+            <button type="submit" class="btn primary">添加</button>
+            <span id="add-repo-status" class="hint"></span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 通用确认对话框 -->
+  <div id="confirm-modal" class="modal" aria-hidden="true">
+    <div class="modal-mask" data-modal-close></div>
+    <div class="modal-panel small">
+      <div class="modal-head">
+        <h3 id="confirm-title">确认</h3>
+      </div>
+      <div class="confirm-body">
+        <p id="confirm-message"></p>
+        <label id="confirm-purge-wrap" hidden>
+          <input type="checkbox" id="confirm-purge"> 同时清理已克隆的 repo / facts / reports
+        </label>
+      </div>
+      <div class="actions" style="justify-content:flex-end">
+        <button class="btn ghost" id="confirm-cancel">取消</button>
+        <button class="btn danger" id="confirm-ok">确认</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

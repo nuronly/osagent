@@ -17,9 +17,12 @@ from rich.table import Table
 from .analyzer import analyze_by_repo_id, has_facts, list_mcp_tools, load_facts
 from .config import settings
 from .ingest import (
+    add_repo_manual,
     build_manifest,
     clone_many,
     clone_one,
+    delete_repo,
+    import_xlsx_incremental,
     load_manifest,
     manifest_stats,
     sample_probe,
@@ -102,6 +105,104 @@ def manifest_stats_cmd() -> None:
     t.add_row("Track 分布", json.dumps(stats["by_track"], ensure_ascii=False))
     t.add_row("Status 分布", json.dumps(stats["by_status"], ensure_ascii=False))
     console.print(t)
+
+
+@manifest_app.command("import-xlsx")
+def manifest_import_xlsx(
+    xlsx: str = typer.Argument(..., help="要导入的 .xlsx 路径"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run",
+        help="只预览不写盘，输出每行结果",
+    ),
+) -> None:
+    """增量导入 Excel（merge 策略：URL 已存在则跳过，不动旧仓 repo_id）。"""
+    from pathlib import Path as _Path
+    p = _Path(xlsx).expanduser().resolve()
+    if not p.exists():
+        console.print(f"[red]文件不存在: {p}[/red]")
+        raise typer.Exit(1)
+
+    report = import_xlsx_incremental(p, dry_run=dry_run, source_label=p.name)
+
+    t = Table(title=f"导入{'预览' if dry_run else '结果'}: {p.name}")
+    t.add_column("指标", style="cyan")
+    t.add_column("值", justify="right")
+    t.add_row("xlsx 总行数（除表头）", str(report.total_rows))
+    t.add_row("新增", f"[green]{report.added}[/green]")
+    t.add_row("跳过", f"[yellow]{report.skipped}[/yellow]")
+    t.add_row("错误", f"[red]{report.errors}[/red]")
+    if report.backup_path:
+        t.add_row("备份文件", report.backup_path)
+    console.print(t)
+
+    # 错误行明细
+    errs = [r for r in report.rows if r.action == "error"]
+    if errs:
+        console.print("\n[red]错误明细：[/red]")
+        for r in errs[:20]:
+            console.print(f"  row {r.row}: {r.reason}")
+    if dry_run and report.added > 0:
+        console.print(
+            f"\n[yellow]这是预览。要正式导入，去掉 --dry-run 重跑即可。[/yellow]"
+        )
+
+
+@manifest_app.command("add-repo")
+def manifest_add_repo(
+    year: int = typer.Option(..., help="年份，如 2026"),
+    team: str = typer.Option(..., help="队伍名称"),
+    school: str = typer.Option(..., help="学校"),
+    repo_url: str = typer.Option(..., "--url", help="仓库 URL"),
+    contest: str = typer.Option("操作系统赛", help="赛事"),
+    track: str = typer.Option("内核实现赛道", help="子赛事 / 赛道"),
+) -> None:
+    """手工添加一条仓库（URL 已存在会报错）。"""
+    from .schemas import ManualRepoInput
+    try:
+        entry = add_repo_manual(ManualRepoInput(
+            year=year, team=team, school=school, repo_url=repo_url,
+            contest=contest, track=track,
+        ))
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+    console.print(f"[green]已添加:[/green] {entry.repo_id}  ({entry.team} / {entry.school})")
+
+
+@manifest_app.command("delete-repo")
+def manifest_delete_repo(
+    repo_id: str = typer.Argument(..., help="要删除的 repo_id"),
+    purge: bool = typer.Option(
+        False, "--purge",
+        help="同时清理 data/repos/<id>、facts/<id>.json、reports/<id>.{md,html}",
+    ),
+    yes: bool = typer.Option(False, "-y", "--yes", help="跳过确认"),
+) -> None:
+    """从 manifest 删除一条仓库记录（会自动备份）。"""
+    if not yes:
+        msg = f"确认删除 {repo_id}"
+        if purge:
+            msg += "（含本地 repo / facts / reports）"
+        ok = typer.confirm(msg, default=False)
+        if not ok:
+            console.print("[yellow]已取消[/yellow]")
+            raise typer.Exit(0)
+
+    try:
+        result = delete_repo(repo_id, purge_data=purge)
+    except (ValueError, FileNotFoundError) as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[green]已删除:[/green] {result.repo_id}")
+    if result.purged_paths:
+        console.print("  清理的路径：")
+        for p in result.purged_paths:
+            console.print(f"    - {p}")
+    if result.skipped_paths:
+        console.print("  跳过：")
+        for p in result.skipped_paths:
+            console.print(f"    - {p}")
 
 
 @manifest_app.command("show")

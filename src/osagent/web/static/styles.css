@@ -346,3 +346,164 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--muted);
   border-top: 1px solid rgba(255,255,255,.05);
 }
+/* ===========================================================
+   v0.7：导入仓库 modal + 删除确认对话框
+   =========================================================== */
+
+/* 危险按钮 */
+.btn.danger {
+  background: rgba(248,113,113,.12);
+  color: var(--danger);
+  border-color: rgba(248,113,113,.35);
+}
+.btn.danger:hover {
+  background: rgba(248,113,113,.22);
+}
+
+/* Modal 通用 */
+.modal {
+  position: fixed; inset: 0; z-index: 1000;
+  display: none; align-items: center; justify-content: center;
+}
+.modal.open { display: flex; }
+.modal-mask {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(2px);
+}
+.modal-panel {
+  position: relative; z-index: 1;
+  width: min(680px, 92vw);
+  max-height: 88vh;
+  display: flex; flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 48px rgba(0,0,0,.5);
+  overflow: hidden;
+}
+.modal-panel.small { width: min(440px, 92vw); }
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h3 { margin: 0; font-size: 16px; }
+
+/* Tab 切换 */
+.modal-tabs {
+  display: flex; gap: 4px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: var(--muted);
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  font-size: 13px;
+}
+.tab-btn.active {
+  color: var(--accent);
+  border-color: var(--border);
+  background: var(--panel-2);
+}
+.tab-pane {
+  padding: 14px 18px 16px;
+  overflow-y: auto;
+}
+
+/* 文件拖拽区 */
+.file-drop {
+  display: block;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .15s;
+  background: var(--panel-2);
+}
+.file-drop:hover, .file-drop.dragover {
+  border-color: var(--accent);
+  background: rgba(96,165,250,.08);
+}
+.file-drop-inner .big {
+  font-size: 28px; display: block; margin-bottom: 6px;
+}
+.file-drop-inner > div { margin-top: 4px; }
+
+/* 导入报告 */
+.import-report {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.ir-summary {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  margin-bottom: 8px;
+}
+.ir-stat {
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: center;
+}
+.ir-stat span { display: block; color: var(--muted); font-size: 11px; }
+.ir-stat b { display: block; font-size: 20px; margin-top: 2px; }
+.ir-stat.ok b { color: var(--accent-2); }
+.ir-stat.warn b { color: var(--warn); }
+.ir-stat.err b { color: var(--danger); }
+.import-report details { margin-top: 8px; }
+.import-report summary {
+  cursor: pointer; color: var(--accent); padding: 4px 0;
+}
+.import-report ul { margin: 4px 0 0 18px; padding: 0; }
+.import-report li { line-height: 1.6; }
+
+/* 单仓库表单 */
+.add-repo-form {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px;
+}
+.add-repo-form label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; color: var(--muted);
+}
+.add-repo-form input {
+  padding: 7px 9px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.add-repo-form input:focus {
+  outline: none; border-color: var(--accent);
+}
+.add-repo-form label:has(input[name="repo_url"]) { grid-column: 1 / -1; }
+
+/* 确认对话框 */
+.confirm-body {
+  padding: 14px 18px;
+  font-size: 14px;
+}
+.confirm-body label {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--warn);
+  cursor: pointer;
+  font-size: 13px;
+}
+.confirm-body label input { cursor: pointer; }

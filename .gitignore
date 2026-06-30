@@ -32,6 +32,7 @@ data/cache/
 data/facts/
 data/index/
 data/reports/
+data/backups/
 logs/
 
 # 系统

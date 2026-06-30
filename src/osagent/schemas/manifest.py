@@ -54,3 +54,52 @@ class Manifest(BaseModel):
     source_xlsx: str
     total: int
     repos: list[RepoEntry]
+
+
+# ------------ Manifest 增量导入 / 单仓添加 / 删除（v0.7） ------------
+
+class ManualRepoInput(BaseModel):
+    """前端 / CLI 手工添加一条仓库时的输入。"""
+
+    year: int
+    team: str
+    school: str
+    repo_url: str
+    contest: str = "操作系统赛"
+    track: str = "内核实现赛道"
+
+
+class ImportRowResult(BaseModel):
+    """xlsx 增量导入时每行的结果。"""
+
+    row: int = Field(description="Excel 中的行号（1-based，跳过表头）")
+    action: Literal["added", "skipped", "error"]
+    repo_id: str | None = None
+    repo_url: str | None = None
+    reason: str | None = None  # skipped / error 时填
+
+
+class ImportReport(BaseModel):
+    """xlsx 增量导入的总报告（同时用于 dry-run 预览与实际执行）。"""
+
+    source: str = Field(description="xlsx 路径或上传文件名")
+    mode: Literal["merge"] = "merge"
+    dry_run: bool = False
+    total_rows: int = 0
+    added: int = 0
+    skipped: int = 0
+    errors: int = 0
+    rows: list[ImportRowResult] = Field(default_factory=list)
+    backup_path: str | None = Field(
+        default=None,
+        description="实际执行时（dry_run=False）写入的备份文件路径",
+    )
+
+
+class DeleteRepoResult(BaseModel):
+    """删除一条仓库记录的结果。"""
+
+    repo_id: str
+    deleted: bool
+    purged_paths: list[str] = Field(default_factory=list)
+    skipped_paths: list[str] = Field(default_factory=list)

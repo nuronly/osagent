@@ -17,7 +17,15 @@ from .facts import (
     SyscallTable,
     TechHighlight,
 )
-from .manifest import Manifest, RepoEntry, RepoStatus
+from .manifest import (
+    DeleteRepoResult,
+    ImportReport,
+    ImportRowResult,
+    Manifest,
+    ManualRepoInput,
+    RepoEntry,
+    RepoStatus,
+)
 from .compare import (
     BasicsDiff,
     CompareReport,
@@ -43,6 +51,10 @@ __all__ = [
     "Manifest",
     "RepoEntry",
     "RepoStatus",
+    "ManualRepoInput",
+    "ImportReport",
+    "ImportRowResult",
+    "DeleteRepoResult",
     "RepoFacts",
     "Basics",
     "BuildSystem",

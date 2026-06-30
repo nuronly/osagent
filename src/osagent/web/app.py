@@ -10,7 +10,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+import tempfile
+
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -37,8 +39,11 @@ from ..report import (
 )
 from ..config import settings
 from ..ingest import (
+    add_repo_manual,
     build_manifest,
     clone_one,
+    delete_repo,
+    import_xlsx_incremental,
     load_manifest,
     manifest_stats,
     save_manifest,
@@ -47,7 +52,7 @@ from ..llm import get_client
 from ..logging import logger
 from ..qa import ask as qa_ask
 from ..qa.retriever import retrieve as qa_retrieve
-from ..schemas import RepoStatus
+from ..schemas import ManualRepoInput, RepoStatus
 from ..schemas.qa import QARequest
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -131,6 +136,94 @@ def create_app() -> FastAPI:
         """重建 manifest（从 collected-data.xlsx）。"""
         m = build_manifest()
         return {"ok": True, "total": m.total}
+
+    @app.get("/api/manifest/years")
+    def api_manifest_years() -> dict[str, Any]:
+        """返回 manifest 中出现过的所有年份（升序），供前端 dropdown 用。"""
+        try:
+            m = load_manifest()
+        except FileNotFoundError as e:
+            raise HTTPException(404, str(e))
+        years = sorted({r.year for r in m.repos})
+        return {"years": years}
+
+    @app.post("/api/manifest/import-xlsx")
+    async def api_manifest_import_xlsx(
+        file: UploadFile = File(..., description="包含 7 列（年份/赛事/子赛事/学校/队伍/仓库地址）的 .xlsx"),
+        dry_run: bool = Form(False, description="True=只预览不写盘"),
+    ) -> dict[str, Any]:
+        """增量导入 Excel（merge 策略：URL 已存在则跳过，不动旧仓 repo_id）。
+
+        - dry_run=True 返回完整 ImportReport 供前端预览，再让用户确认
+        - dry_run=False 实际写盘，并自动备份当前 manifest 到 data/backups/
+        """
+        if not file.filename or not file.filename.lower().endswith((".xlsx", ".xls")):
+            raise HTTPException(400, "请上传 .xlsx 文件")
+
+        # 落到临时文件再走 openpyxl
+        suffix = Path(file.filename).suffix or ".xlsx"
+        try:
+            content = await file.read()
+        except Exception as e:
+            raise HTTPException(400, f"读取上传文件失败: {e}")
+
+        if not content:
+            raise HTTPException(400, "上传文件为空")
+
+        # 防止恶意巨型文件（10MB 上限，对 168 行的 xlsx 而言绰绰有余）
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(413, "文件过大（限制 10MB）")
+
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        try:
+            tmp.write(content)
+            tmp.flush()
+            tmp.close()
+            try:
+                report = import_xlsx_incremental(
+                    Path(tmp.name),
+                    dry_run=dry_run,
+                    source_label=file.filename,
+                )
+            except Exception as e:
+                logger.exception("import_xlsx_incremental 失败")
+                raise HTTPException(500, f"导入失败: {e}")
+        finally:
+            Path(tmp.name).unlink(missing_ok=True)
+
+        return {"ok": True, "report": report.model_dump(mode="json")}
+
+    @app.post("/api/manifest/add-repo")
+    def api_manifest_add_repo(input_data: ManualRepoInput) -> dict[str, Any]:
+        """手工添加一条仓库。URL 已存在则 409。"""
+        try:
+            entry = add_repo_manual(input_data)
+        except ValueError as e:
+            raise HTTPException(409, str(e))
+        except Exception as e:
+            logger.exception("add_repo_manual 失败")
+            raise HTTPException(500, str(e))
+        return {"ok": True, "entry": entry.model_dump(mode="json")}
+
+    @app.delete("/api/manifest/repos/{repo_id}")
+    def api_manifest_delete_repo(
+        repo_id: str,
+        purge_data: bool = Query(
+            False,
+            description="True=同时清理 data/repos/<id>、facts/<id>.json、reports/<id>.{md,html}",
+        ),
+    ) -> dict[str, Any]:
+        """删除一条 manifest 记录。会自动备份当前 manifest。"""
+        try:
+            result = delete_repo(repo_id, purge_data=purge_data)
+        except FileNotFoundError as e:
+            raise HTTPException(404, str(e))
+        except ValueError as e:
+            raise HTTPException(404, str(e))
+        except Exception as e:
+            logger.exception("delete_repo 失败")
+            raise HTTPException(500, str(e))
+        return {"ok": True, "result": result.model_dump(mode="json")}
 
     # ---------- 单仓库拉取（同步，阻塞调用方；适合调试） ----------
 

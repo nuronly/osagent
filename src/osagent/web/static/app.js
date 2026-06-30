@@ -801,5 +801,271 @@ function bindQaForCompare() {
 bindQaForRepo();
 bindQaForCompare();
 
+// ===========================================================
+//  导入仓库 modal（v0.7：批量 Excel + 单仓库 + 删除确认）
+// ===========================================================
+
+const importModal = $("#import-modal");
+const confirmModal = $("#confirm-modal");
+
+function openModal(modal) {
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("open");
+}
+function closeModal(modal) {
+  modal.setAttribute("aria-hidden", "true");
+  modal.classList.remove("open");
+}
+
+// 通用：所有 [data-modal-close] 都能关闭它所在的 modal
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  if (t.matches("[data-modal-close]")) {
+    const m = t.closest(".modal");
+    if (m) closeModal(m);
+  }
+});
+
+// 顶部按钮打开
+$("#btn-open-import").addEventListener("click", () => {
+  // 重置状态
+  $("#import-file").value = "";
+  $("#file-chosen").textContent = "尚未选择文件";
+  $("#btn-import-confirm").disabled = true;
+  $("#import-status").textContent = "";
+  $("#import-report").hidden = true;
+  $("#import-report").innerHTML = "";
+  $("#add-repo-status").textContent = "";
+  $("#add-repo-form").reset();
+  openModal(importModal);
+});
+
+// tab 切换
+$$(".tab-btn").forEach((b) => {
+  b.addEventListener("click", () => {
+    const target = b.dataset.tab;
+    $$(".tab-btn").forEach((x) => x.classList.toggle("active", x === b));
+    $$(".tab-pane").forEach((p) => {
+      const on = p.dataset.tab === target;
+      p.classList.toggle("active", on);
+      p.hidden = !on;
+    });
+  });
+});
+
+// 文件选择 / 拖拽
+const fileInput = $("#import-file");
+const fileDrop = $("#file-drop");
+
+fileInput.addEventListener("change", () => onFilePicked(fileInput.files[0]));
+fileDrop.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  fileDrop.classList.add("dragover");
+});
+fileDrop.addEventListener("dragleave", () => fileDrop.classList.remove("dragover"));
+fileDrop.addEventListener("drop", (e) => {
+  e.preventDefault();
+  fileDrop.classList.remove("dragover");
+  const f = e.dataTransfer.files[0];
+  if (f) {
+    // 把文件塞回 input 以便后续 form 提交
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    fileInput.files = dt.files;
+    onFilePicked(f);
+  }
+});
+
+function onFilePicked(file) {
+  if (!file) return;
+  $("#file-chosen").textContent = `已选择: ${file.name} (${fmtBytes(file.size)})`;
+  // 选了文件之后，预览按钮可用，但确认按钮仍需先跑一次预览
+  $("#btn-import-confirm").disabled = true;
+  $("#import-report").hidden = true;
+}
+
+async function uploadXlsx(dryRun) {
+  const file = fileInput.files[0];
+  if (!file) {
+    $("#import-status").textContent = "请先选择 xlsx 文件";
+    return null;
+  }
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("dry_run", dryRun ? "true" : "false");
+  $("#import-status").textContent = dryRun ? "预览中…" : "导入中…";
+  $("#btn-import-preview").disabled = true;
+  $("#btn-import-confirm").disabled = true;
+  try {
+    const resp = await fetch("/api/manifest/import-xlsx", {
+      method: "POST",
+      body: fd,  // 让浏览器自动加 boundary
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data.detail || `HTTP ${resp.status}`);
+    }
+    return data.report;
+  } catch (e) {
+    $("#import-status").textContent = "失败：" + e.message;
+    return null;
+  } finally {
+    $("#btn-import-preview").disabled = false;
+  }
+}
+
+function renderImportReport(report, isPreview) {
+  const rows = report.rows || [];
+  const errs = rows.filter((r) => r.action === "error");
+  const skipReasons = {};
+  rows.filter((r) => r.action === "skipped").forEach((r) => {
+    skipReasons[r.reason] = (skipReasons[r.reason] || 0) + 1;
+  });
+
+  const reasonHtml = Object.entries(skipReasons)
+    .map(([k, v]) => `<li><b>${v}</b> 条：${k}</li>`)
+    .join("");
+
+  const errHtml = errs.slice(0, 10)
+    .map((r) => `<li>row ${r.row}: ${r.reason}</li>`)
+    .join("");
+
+  $("#import-report").innerHTML = `
+    <div class="ir-summary">
+      <div class="ir-stat ok"><span>新增</span><b>${report.added}</b></div>
+      <div class="ir-stat warn"><span>跳过</span><b>${report.skipped}</b></div>
+      <div class="ir-stat err"><span>错误</span><b>${report.errors}</b></div>
+      <div class="ir-stat"><span>总行数</span><b>${report.total_rows}</b></div>
+    </div>
+    ${reasonHtml ? `<details open><summary>跳过原因分布</summary><ul>${reasonHtml}</ul></details>` : ""}
+    ${errHtml ? `<details open><summary>错误明细（前 10 条）</summary><ul>${errHtml}</ul></details>` : ""}
+    ${report.backup_path ? `<p class="muted">备份: ${report.backup_path}</p>` : ""}
+  `;
+  $("#import-report").hidden = false;
+
+  if (isPreview) {
+    if (report.added > 0) {
+      $("#btn-import-confirm").disabled = false;
+      $("#import-status").textContent = `预览完成：${report.added} 条将新增，点"确认导入"写盘`;
+    } else {
+      $("#btn-import-confirm").disabled = true;
+      $("#import-status").textContent = "预览完成：没有可导入的新仓库";
+    }
+  } else {
+    $("#btn-import-confirm").disabled = true;
+    $("#import-status").textContent = `已导入 ${report.added} 条`;
+  }
+}
+
+$("#btn-import-preview").addEventListener("click", async () => {
+  const report = await uploadXlsx(true);
+  if (report) renderImportReport(report, true);
+});
+
+$("#btn-import-confirm").addEventListener("click", async () => {
+  const report = await uploadXlsx(false);
+  if (report) {
+    renderImportReport(report, false);
+    // 同时刷新概览数据，便于用户看到变化
+    loadOverview();
+    // 强制让"仓库列表"年份过滤器下次重新拉
+    $("#filter-year").innerHTML = '<option value="">全部年份</option>';
+  }
+});
+
+// ---- 单仓库添加表单 ----
+$("#add-repo-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = {
+    year: parseInt(fd.get("year"), 10),
+    team: fd.get("team").trim(),
+    school: fd.get("school").trim(),
+    repo_url: fd.get("repo_url").trim(),
+    contest: fd.get("contest").trim() || "操作系统赛",
+    track: fd.get("track").trim() || "内核实现赛道",
+  };
+  $("#add-repo-status").textContent = "添加中…";
+  try {
+    const resp = await fetch("/api/manifest/add-repo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data.detail || `HTTP ${resp.status}`);
+    }
+    $("#add-repo-status").innerHTML =
+      `<span style="color:var(--ok,#19a974)">✓ 已添加: ${data.entry.repo_id}</span>`;
+    e.target.reset();
+    loadOverview();
+    $("#filter-year").innerHTML = '<option value="">全部年份</option>';
+  } catch (err) {
+    $("#add-repo-status").innerHTML =
+      `<span style="color:var(--danger)">✗ ${err.message}</span>`;
+  }
+});
+
+// ===========================================================
+//  通用确认对话框 + 删除仓库
+// ===========================================================
+
+function askConfirm({ title = "确认", message = "", showPurge = false }) {
+  return new Promise((resolve) => {
+    $("#confirm-title").textContent = title;
+    $("#confirm-message").textContent = message;
+    $("#confirm-purge-wrap").hidden = !showPurge;
+    $("#confirm-purge").checked = false;
+    openModal(confirmModal);
+
+    const cleanup = () => {
+      $("#confirm-ok").removeEventListener("click", onOk);
+      $("#confirm-cancel").removeEventListener("click", onCancel);
+    };
+    const onOk = () => {
+      const purge = showPurge ? $("#confirm-purge").checked : false;
+      cleanup();
+      closeModal(confirmModal);
+      resolve({ ok: true, purge });
+    };
+    const onCancel = () => {
+      cleanup();
+      closeModal(confirmModal);
+      resolve({ ok: false, purge: false });
+    };
+    $("#confirm-ok").addEventListener("click", onOk);
+    $("#confirm-cancel").addEventListener("click", onCancel);
+  });
+}
+
+// 抽屉里的删除按钮
+$("#btn-delete-repo").addEventListener("click", async () => {
+  if (!currentRepoId) return;
+  const decision = await askConfirm({
+    title: "删除仓库",
+    message: `确认从 manifest 删除 "${currentRepoId}" 吗？此操作会自动备份当前 manifest。`,
+    showPurge: true,
+  });
+  if (!decision.ok) return;
+  const out = $("#clone-result");
+  out.textContent = "删除中…";
+  try {
+    const url = `/api/manifest/repos/${encodeURIComponent(currentRepoId)}?purge_data=${decision.purge}`;
+    const resp = await fetch(url, { method: "DELETE" });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+    out.innerHTML = `<span style="color:var(--ok,#19a974)">✓ 已删除${decision.purge ? `（清理 ${data.result.purged_paths.length} 个文件 / 目录）` : ""}</span>`;
+    // 关抽屉 + 刷列表
+    $("#drawer").classList.remove("open");
+    currentRepoId = null;
+    fetchAndRenderRepos();
+    loadOverview();
+    $("#filter-year").innerHTML = '<option value="">全部年份</option>';
+  } catch (e) {
+    out.innerHTML = `<span style="color:var(--danger)">✗ ${e.message}</span>`;
+  }
+});
+
 // 默认加载概览
 loadOverview();
