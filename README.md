@@ -74,15 +74,15 @@ osagent manifest show --year 2021 # 按年份查看仓库
 osagent ingest probe -n 5         # 抽样拉取 N 个仓库测试连通性
 osagent ingest clone-all          # 批量拉取所有仓库（耗时较长）
 osagent analyzer list-tools       # 列出 MCP Static Analyzer 9 个工具契约
-osagent serve --port 8000         # 启动 Web 仪表盘
+osagent serve                     # 启动 Web 仪表盘（默认 8765 端口）
 ```
 
 ## Web 仪表盘
 
 ```bash
-osagent serve                     # 默认 http://127.0.0.1:8000
-# 或开发模式（改代码自动重载）：
-osagent serve --reload
+osagent serve                     # 默认 http://127.0.0.1:8765
+osagent serve --port 9000         # 换端口
+osagent serve --reload            # 开发模式（改代码自动重载）
 ```
 
 界面包含三个 tab：
@@ -90,4 +90,4 @@ osagent serve --reload
 - **仓库**：按年份/状态/关键字过滤，点"查看"看详情、可单独触发克隆
 - **LLM**：一键 ping DeepSeek，看模型 / token 用量
 
-API 文档（Swagger UI）：`http://127.0.0.1:8000/docs`
+API 文档（Swagger UI）：`http://127.0.0.1:8765/docs`
