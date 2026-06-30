@@ -7,6 +7,9 @@ PPT：
 https://pan.baidu.com/s/1BUffpTGAu4cjnQv1zyBnCw?pwd=1111 
 提取码: 1111
 
+文档：
+osAgent项目文档.md
+
 > 面向小型操作系统的分析比对智能体系统
 > 服务对象：全国大学生操作系统比赛（OS Kernel 赛道）评审与组委会
 > 设计方案见 [`方案.md`](方案.md)
