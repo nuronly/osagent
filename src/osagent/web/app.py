@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from ..analyzer import (
@@ -21,6 +21,7 @@ from ..analyzer import (
     has_facts,
     load_facts,
 )
+from ..report import build_report, has_html, has_md, html_path, md_path
 from ..config import settings
 from ..ingest import (
     build_manifest,
@@ -232,6 +233,58 @@ def create_app() -> FastAPI:
                 "last": f.dev_history.last_commit_at.isoformat() if f.dev_history.last_commit_at else None,
             },
             "summary": f.summary_for_embedding,
+        }
+
+    # ---------- 报告 ----------
+
+    @app.post("/api/repos/{repo_id}/report")
+    def api_repo_report(
+        repo_id: str,
+        fmt: str = "both",
+    ) -> dict[str, Any]:
+        """生成单仓库分析报告。需要事实表已存在（先 POST /analyze）。
+
+        Returns: {"ok", "md_path"?, "html_path"?, "md_chars"?, "html_chars"?}
+        """
+        if fmt not in {"md", "html", "both"}:
+            raise HTTPException(400, f"fmt 必须是 md/html/both，得到: {fmt}")
+        if not has_facts(repo_id):
+            raise HTTPException(
+                400, f"事实表不存在，请先 POST /api/repos/{repo_id}/analyze",
+            )
+        try:
+            out = build_report(repo_id, fmt=fmt)  # type: ignore[arg-type]
+        except Exception as e:
+            logger.exception("build_report 失败")
+            raise HTTPException(500, str(e))
+        return {"ok": True, **out}
+
+    @app.get("/api/repos/{repo_id}/report.md", response_class=PlainTextResponse)
+    def api_repo_report_md(repo_id: str) -> PlainTextResponse:
+        if not has_md(repo_id):
+            raise HTTPException(
+                404, f"Markdown 报告不存在，先 POST /api/repos/{repo_id}/report",
+            )
+        return PlainTextResponse(
+            md_path(repo_id).read_text(encoding="utf-8"),
+            media_type="text/markdown; charset=utf-8",
+        )
+
+    @app.get("/api/repos/{repo_id}/report.html", response_class=HTMLResponse)
+    def api_repo_report_html(repo_id: str) -> HTMLResponse:
+        if not has_html(repo_id):
+            raise HTTPException(
+                404, f"HTML 报告不存在，先 POST /api/repos/{repo_id}/report",
+            )
+        return HTMLResponse(html_path(repo_id).read_text(encoding="utf-8"))
+
+    @app.get("/api/repos/{repo_id}/report/status")
+    def api_repo_report_status(repo_id: str) -> dict[str, Any]:
+        return {
+            "repo_id": repo_id,
+            "has_facts": has_facts(repo_id),
+            "has_md": has_md(repo_id),
+            "has_html": has_html(repo_id),
         }
 
     # ---------- LLM ----------

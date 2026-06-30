@@ -3,9 +3,11 @@ from .facts import (
     Basics,
     BuildSystem,
     CallGraph,
+    CodeExcerpt,
     Commit,
     Confidence,
     DevHistory,
+    DirectoryNode,
     Evidence,
     FunctionNode,
     KernelFeature,
@@ -13,6 +15,7 @@ from .facts import (
     RepoFacts,
     Syscall,
     SyscallTable,
+    TechHighlight,
 )
 from .manifest import Manifest, RepoEntry, RepoStatus
 
@@ -24,13 +27,16 @@ __all__ = [
     "Basics",
     "BuildSystem",
     "CallGraph",
+    "CodeExcerpt",
     "Commit",
     "Confidence",
     "DevHistory",
+    "DirectoryNode",
     "Evidence",
     "FunctionNode",
     "KernelFeature",
     "LanguageStat",
     "Syscall",
     "SyscallTable",
+    "TechHighlight",
 ]

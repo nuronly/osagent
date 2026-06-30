@@ -215,6 +215,11 @@ async function openDrawer(repoId) {
   $("#analyze-result").textContent = "";
   $("#facts-content").textContent = "";
   $("#analyze-progress").style.display = "none";
+  $("#report-result").textContent = "";
+  $("#report-frame").style.display = "none";
+  $("#report-frame").src = "about:blank";
+  $("#btn-open-html").disabled = true;
+  $("#btn-open-md").disabled = true;
   $("#drawer").classList.add("open");
   try {
     const data = await api(`/api/manifest/repos/${encodeURIComponent(repoId)}`);
@@ -224,6 +229,19 @@ async function openDrawer(repoId) {
   }
   // 顺手加载已有事实表（如果存在）
   loadFactsIfExists(repoId);
+  // 顺手检查报告是否已存在
+  refreshReportStatus(repoId);
+}
+
+async function refreshReportStatus(repoId) {
+  try {
+    const s = await api(`/api/repos/${encodeURIComponent(repoId)}/report/status`);
+    $("#btn-open-html").disabled = !s.has_html;
+    $("#btn-open-md").disabled = !s.has_md;
+    if (s.has_html || s.has_md) {
+      $("#report-result").textContent = "已存在历史报告";
+    }
+  } catch {}
 }
 async function loadFactsIfExists(repoId) {
   try {
@@ -330,6 +348,47 @@ async function pollJob(jobId) {
 
 $("#btn-analyze").addEventListener("click", () => startAnalyze(false));
 $("#btn-analyze-force").addEventListener("click", () => startAnalyze(true));
+
+// ===== 分析报告 =====
+async function buildReport() {
+  if (!currentRepoId) return;
+  const btn = $("#btn-build-report");
+  const out = $("#report-result");
+  btn.disabled = true;
+  out.textContent = "生成中（一般 < 2 秒）…";
+  try {
+    const r = await api(`/api/repos/${encodeURIComponent(currentRepoId)}/report`, { method: "POST" });
+    const parts = [];
+    if (r.md_chars != null) parts.push(`md ${(r.md_chars / 1024).toFixed(1)}KB`);
+    if (r.html_chars != null) parts.push(`html ${(r.html_chars / 1024).toFixed(1)}KB`);
+    out.textContent = "已生成：" + parts.join(" / ");
+    $("#btn-open-html").disabled = false;
+    $("#btn-open-md").disabled = false;
+    // 自动加载到 iframe 预览
+    openReportHtml();
+  } catch (e) {
+    out.textContent = "失败：" + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function openReportHtml() {
+  if (!currentRepoId) return;
+  const url = `/api/repos/${encodeURIComponent(currentRepoId)}/report.html?t=${Date.now()}`;
+  const frame = $("#report-frame");
+  frame.src = url;
+  frame.style.display = "block";
+}
+
+function openReportMd() {
+  if (!currentRepoId) return;
+  window.open(`/api/repos/${encodeURIComponent(currentRepoId)}/report.md?t=${Date.now()}`, "_blank");
+}
+
+$("#btn-build-report").addEventListener("click", buildReport);
+$("#btn-open-html").addEventListener("click", openReportHtml);
+$("#btn-open-md").addEventListener("click", openReportMd);
 
 // ===== LLM =====
 $("#btn-ping").addEventListener("click", async () => {

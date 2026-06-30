@@ -8,6 +8,10 @@ from ..config import settings
 from ..schemas import RepoFacts
 
 
+def facts_dir() -> Path:
+    return settings.facts_dir
+
+
 def facts_path(repo_id: str) -> Path:
     return settings.facts_dir / f"{repo_id}.json"
 

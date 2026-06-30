@@ -35,11 +35,13 @@ llm_app = typer.Typer(help="LLM 相关命令")
 manifest_app = typer.Typer(help="仓库清单管理")
 ingest_app = typer.Typer(help="仓库拉取")
 analyzer_app = typer.Typer(help="静态分析")
+report_app = typer.Typer(help="分析报告生成")
 
 app.add_typer(llm_app, name="llm")
 app.add_typer(manifest_app, name="manifest")
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(analyzer_app, name="analyzer")
+app.add_typer(report_app, name="report")
 
 
 @app.command("serve")
@@ -282,6 +284,70 @@ def analyzer_show(
     else:
         console.print(f"[red]未知 section: {section}[/red]")
         raise typer.Exit(1)
+
+
+# ============ report ============
+
+@report_app.command("build")
+def report_build(
+    repo_id: str = typer.Argument(..., help="manifest 中的 repo_id"),
+    fmt: str = typer.Option("both", help="md / html / both"),
+    analyze_if_missing: bool = typer.Option(
+        True, "--analyze/--no-analyze",
+        help="事实表缺失时是否自动跑一次 L2 分析",
+    ),
+) -> None:
+    """生成单仓库的分析报告（Markdown + HTML，落盘到 data/reports/）。"""
+    from .report import build_report
+    if fmt not in {"md", "html", "both"}:
+        console.print(f"[red]fmt 必须是 md/html/both，得到: {fmt}[/red]")
+        raise typer.Exit(1)
+
+    if not has_facts(repo_id):
+        if not analyze_if_missing:
+            console.print(
+                f"[red]事实表不存在: {repo_id}。先 `osagent analyzer analyze {repo_id}`，"
+                f"或加 --analyze[/red]"
+            )
+            raise typer.Exit(1)
+        console.print(f"[yellow]事实表不存在，自动跑 L2 分析: {repo_id}[/yellow]")
+
+        def _on_progress(stage, msg, pct):
+            console.print(f"[cyan][{pct:3d}%][/cyan] [{stage}] {msg}")
+
+        analyze_by_repo_id(repo_id, level="L2", on_progress=_on_progress)
+
+    out = build_report(repo_id, fmt=fmt)  # type: ignore[arg-type]
+    console.print(f"[green]done.[/green]")
+    if "md_path" in out:
+        console.print(f"  md   → {out['md_path']}  ({out.get('md_chars', 0):,} chars)")
+    if "html_path" in out:
+        console.print(f"  html → {out['html_path']}  ({out.get('html_chars', 0):,} chars)")
+
+
+@report_app.command("build-all")
+def report_build_all(
+    fmt: str = typer.Option("both", help="md / html / both"),
+) -> None:
+    """对所有已生成事实表的仓库批量生成报告。"""
+    from .analyzer.storage import facts_dir
+    from .report import build_report
+
+    fd = facts_dir()
+    repo_ids = sorted(p.stem for p in fd.glob("*.json"))
+    if not repo_ids:
+        console.print("[yellow]没有可用的事实表，先跑 analyzer analyze[/yellow]")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]将生成 {len(repo_ids)} 份报告[/bold]")
+    for rid in repo_ids:
+        try:
+            out = build_report(rid, fmt=fmt)  # type: ignore[arg-type]
+            md = out.get("md_chars", 0)
+            html_ = out.get("html_chars", 0)
+            console.print(f"  [green]ok[/green] {rid:40s} md={md:>6,} html={html_:>6,}")
+        except Exception as e:
+            console.print(f"  [red]fail[/red] {rid}  {e}")
 
 
 if __name__ == "__main__":

@@ -30,7 +30,9 @@ from ..schemas import (
 from . import l1_quick, l2_kernel, l3_signature
 from .contract import RepoRef
 from .core import walk_files
+from .directory_tree import build_tree
 from .storage import save_facts
+from .tech_highlights import build_project_summary, build_tech_highlights
 
 ProgressCb = Callable[[str, str, int], None]
 Level = Literal["L1", "L2", "L3"]
@@ -126,7 +128,23 @@ def analyze(
             on_progress("l3", "L3 跳过（datasketch 未安装或签名为空）", 90)
 
     # ---------- 拼装 RepoFacts ----------
-    on_progress("assemble", "拼装事实表", 95)
+    on_progress("assemble", "拼装事实表（目录树 / 技术特点 / 项目总结）", 93)
+
+    # 目录树
+    try:
+        dir_tree = build_tree(scan)
+    except Exception as e:
+        logger.exception(f"目录树构建失败: {e}")
+        dir_tree = None
+
+    # 技术特点 / 项目总结（基于已富化的 subsystems）
+    try:
+        tech_hl = build_tech_highlights(subsystems, syscalls)
+        proj_summary = build_project_summary(subsystems, syscalls, repo_id=ref.repo_id)
+    except Exception as e:
+        logger.exception(f"技术特点/项目总结构建失败: {e}")
+        tech_hl, proj_summary = [], []
+
     facts = RepoFacts(
         repo_id=ref.repo_id,
         head_commit=ref.head_commit or "",
@@ -136,6 +154,9 @@ def analyze(
         call_graph=cg,
         dev_history=dev_hist,
         summary_for_embedding=_build_summary(ref.repo_id, basics, subsystems, syscalls),
+        directory_tree=dir_tree,
+        tech_highlights=tech_hl,
+        project_summary=proj_summary,
     )
 
     if persist:

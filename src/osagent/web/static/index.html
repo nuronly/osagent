@@ -121,6 +121,15 @@
         <div class="progress-text" id="analyze-msg"></div>
       </div>
       <pre class="code" id="facts-content"></pre>
+
+      <h4>分析报告</h4>
+      <div class="actions">
+        <button class="btn primary" id="btn-build-report">📄 生成报告</button>
+        <button class="btn" id="btn-open-html" disabled>🔗 打开 HTML</button>
+        <button class="btn ghost" id="btn-open-md" disabled>📝 查看 Markdown</button>
+        <span id="report-result" class="hint"></span>
+      </div>
+      <iframe id="report-frame" style="display:none;width:100%;height:560px;border:1px solid var(--border);border-radius:6px;margin-top:.6rem;background:#fff"></iframe>
     </div>
   </aside>
 
