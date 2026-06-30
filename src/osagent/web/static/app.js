@@ -12,10 +12,7 @@ const fmtBytes = (n) => {
 
 const fmtNum = (n) => (n == null ? "-" : Number(n).toLocaleString());
 
-const escapeHtml = (s) =>
-  String(s ?? "")
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+// escapeHtml 在文件底部已声明（function escapeHtml(s) ...），此处不再重复
 
 // "2 天前" / "刚刚" / "3 小时前" — 输入 ISO string 或 null
 function fmtRelativeTime(iso) {
@@ -732,7 +729,7 @@ function qaResetHistory(historyId) {
 }
 
 function escapeHtml(s) {
-  return String(s)
+  return String(s ?? "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
