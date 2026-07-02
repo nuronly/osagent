@@ -36,6 +36,7 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
     "python-multipart>=0.0.9",  # FastAPI 接收 multipart/form-data 上传必需
+    "markdown>=3.6",             # report/html.py 把 md 渲染为 html
 
     # 后续阶段（先声明，按需 import）
     # "tree-sitter>=0.22",
