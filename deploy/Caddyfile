@@ -1,0 +1,79 @@
+# /etc/caddy/Caddyfile — osAgent 反向代理配置
+#
+# 当前使用：IP 直连模式（无域名，HTTP）
+# 有域名后：把  :80  改成  yourdomain.com  即自动 HTTPS（Let's Encrypt）
+#
+# basic_auth 密码占位：CHANGE_ME_HASH（生成方法见下方注释）
+# ------------------------------------------------------------
+
+{
+    # 全局配置：邮箱用于 Let's Encrypt 通知（切域名时会用到）
+    email admin@example.com
+
+    # 全局访问日志（journalctl -u caddy -f 可查）
+    admin off
+}
+
+# ============ 站点：IP 直连（HTTP 模式）============
+# 将来换域名，把这行 :80 换成 yourdomain.com，Caddy 自动申请 HTTPS
+:80 {
+
+    # ---------- basic_auth ----------
+    # 保护整个站点。首次生成 hash：
+    #   caddy hash-password
+    # 然后把输出的 $2a$14$xxx... 替换下面这行
+    basic_auth {
+        # 用户名 admin，密码 CHANGE_ME_PLAINTEXT（未加密！仅占位）
+        # 正式部署前务必替换成 caddy hash-password 生成的 bcrypt 值
+        admin $2a$14$REPLACE_WITH_HASH_FROM_caddy_hash-password
+    }
+
+    # ---------- 反向代理 ----------
+    reverse_proxy 127.0.0.1:8765 {
+        # 传真实 IP 给后端（后端日志好看）
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # 长任务超时（LLM 调用最长 5 分钟）
+        transport http {
+            read_timeout 300s
+            write_timeout 300s
+        }
+    }
+
+    # ---------- 压缩（3 Mbps 带宽必开）----------
+    encode gzip zstd
+
+    # ---------- 安全响应头 ----------
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        Referrer-Policy no-referrer
+        # 上 HTTPS 后再加：
+        # Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+
+    # ---------- 上传体积上限（Excel 导入需要）----------
+    request_body {
+        max_size 20MB
+    }
+
+    # ---------- 访问日志 ----------
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 20mb
+            roll_keep 5
+        }
+        format json
+    }
+}
+
+# ============ 有域名后的模板（现在注释掉）============
+# yourdomain.com {
+#     basic_auth {
+#         admin $2a$14$xxx
+#     }
+#     reverse_proxy 127.0.0.1:8765
+#     encode gzip zstd
+# }

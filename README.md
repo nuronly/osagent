@@ -44,6 +44,19 @@ cp .env.example .env
 osagent serve                     # http://127.0.0.1:8765
 ```
 
+## 部署上线（阿里云 ECS）
+
+一键部署到阿里云 ECS（Alibaba Cloud Linux 3 / RHEL 系）：
+
+```bash
+ssh root@<你的公网IP>
+curl -fsSL https://raw.githubusercontent.com/nuronly/osagent/main/deploy/deploy.sh -o /tmp/deploy.sh
+sudo bash /tmp/deploy.sh
+```
+
+包含 systemd 守护 + Caddy 反代 + basic_auth + API Key 双保险 + 自动 swap。
+完整流程见 [`deploy/README.md`](deploy/README.md)。
+
 ## 目录结构
 
 ```

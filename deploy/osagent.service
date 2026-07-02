@@ -1,0 +1,51 @@
+[Unit]
+Description=osAgent - 面向小型操作系统的分析比对智能体系统
+Documentation=https://github.com/nuronly/osagent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=osagent
+Group=osagent
+WorkingDirectory=/opt/osagent
+
+# 环境变量：DEEPSEEK_API_KEY / OSAGENT_API_KEY / DATA_DIR 等
+EnvironmentFile=/etc/osagent/osagent.env
+
+# 只绑 127.0.0.1，公网入口交给 Caddy 反代（更安全）
+ExecStart=/opt/osagent/.venv/bin/python -m osagent.cli serve --host 127.0.0.1 --port 8765
+
+# 崩溃自动拉起
+Restart=always
+RestartSec=5s
+StartLimitBurst=10
+StartLimitInterval=120s
+
+# 日志走 journald（journalctl -u osagent -f 查看）
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=osagent
+
+# ---------- 安全加固（沙盒）----------
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# 只允许写数据目录 + 日志
+ReadWritePaths=/var/lib/osagent /var/log/osagent /opt/osagent/data
+# 不允许改 /etc /usr 等
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false   # Python 需要 mmap 可执行，不能开
+
+# ---------- 资源限制（2G 内存机器）----------
+MemoryMax=1500M                # 留 500M 给系统 + Caddy
+CPUQuota=180%                  # 2 核最多用 180%
+TasksMax=512
+
+[Install]
+WantedBy=multi-user.target

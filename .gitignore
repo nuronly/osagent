@@ -25,6 +25,7 @@ htmlcov/
 .env
 .env.*
 !.env.example
+!deploy/osagent.env.example
 
 # 数据与产物
 data/repos/

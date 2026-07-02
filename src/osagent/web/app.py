@@ -65,6 +65,10 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
+    # 可选：API Key 保护写接口（生产环境设 OSAGENT_API_KEY 环境变量即启用）
+    from .auth import install_api_key_middleware
+    install_api_key_middleware(app)
+
     # ---------- Manifest ----------
 
     @app.get("/api/manifest/stats")
