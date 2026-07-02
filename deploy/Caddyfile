@@ -22,7 +22,12 @@
     # 保护整个站点。首次生成 hash：
     #   caddy hash-password
     # 然后把输出的 $2a$14$xxx... 替换下面这行
-    basic_auth {
+    #
+    # ⚠️ Caddy 版本兼容：
+    #   v2.7+ 用 basic_auth（带下划线）
+    #   v2.6- 用 basicauth（无下划线）— 阿里云 COPR 装的是 v2.6.4
+    #   如启动报 "unrecognized directive: basic_auth"，改成 basicauth
+    basicauth {
         # 用户名 admin，密码 CHANGE_ME_PLAINTEXT（未加密！仅占位）
         # 正式部署前务必替换成 caddy hash-password 生成的 bcrypt 值
         admin $2a$14$REPLACE_WITH_HASH_FROM_caddy_hash-password
