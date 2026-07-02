@@ -30,7 +30,15 @@ EOF
 # ============ 2. 依赖 ============
 log "2/9  安装系统依赖（dnf）"
 dnf -y install epel-release || true
-dnf -y install python3 python3-pip python3-devel git curl wget tar gcc make firewalld chrony
+# 优先装 python3.11（osagent 依赖 openai>=1.40 要求 py>=3.8, fastapi>=0.110 要求 py>=3.9）
+# Alibaba Cloud Linux 3 默认 python3 只有 3.6，装不上现代依赖
+if ! command -v python3.11 >/dev/null 2>&1; then
+  dnf -y module reset python 2>/dev/null || true
+  dnf -y module install python:3.11 2>/dev/null || dnf -y install python3.11 python3.11-devel python3.11-pip
+fi
+dnf -y install git curl wget tar gcc make firewalld chrony
+PYTHON_BIN=$(command -v python3.11 || command -v python3)
+log "     使用 Python: $PYTHON_BIN ($($PYTHON_BIN --version))"
 
 # Caddy
 if ! command -v caddy >/dev/null 2>&1; then
@@ -96,8 +104,18 @@ fi
 ls "$APP_HOME/deploy/" >/dev/null 2>&1 || { err "代码 clone 失败，deploy/ 目录不存在"; exit 1; }
 
 # ============ 6. venv + pip ============
-log "6/9  venv + pip install（会花 1-3 分钟）"
-[[ -d "$APP_HOME/.venv" ]] || sudo -u "$APP_USER" python3 -m venv "$APP_HOME/.venv"
+log "6/9  venv + pip install（会花 1-3 分钟，用 $PYTHON_BIN）"
+# 如果 venv 里的 python 版本不对（旧 3.6），先删了重建
+if [[ -d "$APP_HOME/.venv" ]]; then
+  VENV_PY_VER=$("$APP_HOME/.venv/bin/python" -c 'import sys; print(sys.version_info[:2])' 2>/dev/null || echo "old")
+  case "$VENV_PY_VER" in
+    "(3, 6)"|"(3, 7)"|"old")
+      warn "     旧 venv Python 版本 $VENV_PY_VER 太老，删掉重建"
+      rm -rf "$APP_HOME/.venv"
+      ;;
+  esac
+fi
+[[ -d "$APP_HOME/.venv" ]] || sudo -u "$APP_USER" "$PYTHON_BIN" -m venv "$APP_HOME/.venv"
 sudo -u "$APP_USER" "$APP_HOME/.venv/bin/pip" install -q --upgrade pip setuptools wheel
 sudo -u "$APP_USER" "$APP_HOME/.venv/bin/pip" install -q -e "$APP_HOME"
 
